@@ -1,0 +1,28 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r read in}
+library(tidyverse)
+library(readr)
+colour_data <- read_csv('../../Data/colour_area.csv')
+all_data <- read_csv('../../Data/FINAL_DATA.csv')
+```
+
+Validate all the available colour data is in the final sheet. Also create a metadata sheet for colour_area.csv
+
+
+```{r checks}
+jackie_patt <- all_data$Fish[!is.na(all_data$Orange)]
+jackie_patt_black <- all_data$Fish[!is.na(all_data$Black)]
+
+setdiff(jackie_patt, jackie_patt_black) #just checking but all fish with colour data have both
+all_patt <- colour_data$MHC_ID
+
+missing_ids <- setdiff(all_patt, jackie_patt) # these arwe all the ids we have colour for that aren't reported in the final_data sheet
+
+setdiff(missing_ids, all_data$Fish) #these fish are not present in the dataset, the rest of the colour data fish are accounted for
+```
+
