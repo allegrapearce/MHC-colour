@@ -1,0 +1,25 @@
+---
+title: "MHC analysis"
+author: "Dr. Kiyoko Gotanda"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load packages
+```{r load packages, echo = FALSE}
+library(car)
+```
+Load dataframes
+```{r load DFs, echo = TRUE}
+rm(list = ls())
+ColDF <- read.csv("./2013-09-30 MHC_Colour.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
+MHCDF <- read.csv("./Full DF 2023-01-23.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
+```
+
+
+
+
