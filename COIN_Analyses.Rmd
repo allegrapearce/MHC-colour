@@ -1,42 +1,37 @@
 ---
-title: "MHC analysis"
-author: "Dr. Kiyoko Gotanda"
-date: "`r Sys.Date()`"
+title: "COIN_Analyses"
 output: html_document
+date: "2023-01-29"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-Load packages
-```{r load packages, echo = FALSE}
-library(car)
+```{r read in, include=FALSE}
 library(tidyverse)
 library(ade4)
-```
-Load dataframes
-```{r load DFs, echo = TRUE}
-rm(list = ls())
-ColDF <- read.csv("./2013-09-30 MHC_Colour.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
-MHCDF <- read.csv("./Full DF 2023-01-23.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
+
+original_colour_data <- read.csv('./2013-09-30 MHC_Colour.csv')
+full_data <- read.csv('./Full DF 2023-01-23.csv')
 ```
 
-#### Analysis To Do: 
--COIN
-  -Isolate all 3 datasets (DONE)   
-  -Run PCAs (DONE)  
-  -bootstrapping, and pearson's correlation coefficient   
-  -Visualization?   
-  
-- richness linear models (micro-allelic richness as independent, Ai and STi as dependent)
-- Wilcoxon rank-sum test on all variables by predation level
-- Wilcoxon rank-sum test on all variables by drainage(?) I think we might not want this now
-#### Co-inertia analyses
+
+#### To Do:   
+-Isolate all 3 datasets   
+-Format into matrices   
+-Run PCAs  
+-Visualization?
+
+*Replicate COIN(1), 1000 bootstrap replicates*
+
+    Data matrix (1) contained MHC-ST frequencies for each population
+    Data matrix (2) contained colour means and Gyrodactylus prevalence for each population
+*Replicate COIN(2)*
+
+    Data matrix (1) contained MHC-Ar, and MHC-STr
+    Data matrix (2) contained colour means and Gyrodactylus prevalence for each population
+
 
 For coinertia analysis the row weighting must be matched between the two dudi (duality diagrams), so for each pca the rows must indicate the same samples. Using only fish we have both genetic data and patternize colour data for we have N = 193.
 ```{r data prep}
-data_for_matrices <- MHCDF %>% 
+data_for_matrices <- full_data %>% 
   filter(!is.na(Orange) & !is.na(Black)) %>% 
   filter(Year == 2010 & Sex == 'Male') 
 #excluding all 2009 guppies because we had unbalanced representation across sites and years
@@ -57,16 +52,7 @@ mhc_r_matrix <- data_for_matrices %>%
   select(Ai, STi) #richness columns, number of different alleles and MHC STs
 ```
 
-
-*COIN(1), 1000 bootstrap replicates??*
-
-    Data matrix (1) contained MHC-ST frequencies for each population
-    Data matrix (2) contained colour means and Gyrodactylus prevalence for each population
-*COIN(2)*
-
-    Data matrix (1) contained MHC-Ar, and MHC-STr
-    Data matrix (2) contained colour means and Gyrodactylus prevalence for each population
-
+Co-inertia analyses
 ```{r coin}
 #COIN 1 - colour and MHC ST frequency
 colour_pca <- dudi.pca(colour_matrix, scannf = FALSE, nf = 3)
@@ -79,6 +65,4 @@ mhc_r_pca <- dudi.pca(mhc_r_matrix, scannf = FALSE, nf = 3)
 
 coinertia(mhc_r_pca, colour_pca, scannf = TRUE) #manually put in axes number to keep? 2?
 ```
-
-
 
