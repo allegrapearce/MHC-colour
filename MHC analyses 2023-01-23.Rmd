@@ -52,6 +52,8 @@ MHCDF_long <- MHCDF %>%
 
 # next calculate the frequency of each unique supertype
 
+# Need to calculate the frequency of each ST (1-15) within each individual
+
 ```
 
 #### Co-inertia analyses
