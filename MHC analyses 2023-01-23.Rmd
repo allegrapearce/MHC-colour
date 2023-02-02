@@ -22,8 +22,13 @@ rm(list = ls())
 ColDF <- read.csv("./2013-09-30 MHC_Colour.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
 MHCDF <- read.csv("./Full DF 2023-01-23.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
 
+<<<<<<< HEAD
 #renaming the allele and st columns for ease of use
 colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tparasites","Infected",	"InfectedBinary", "X", "Orange","Black","site","drainage","sex","length","n.gyros","colour_notes",	"Drainage",	"gt_1","gt_2","gt_3","gt_4","gt_5","gt_6","gt_7","gt_8","gt_9","st_1","st_2","st_3",	"st_4","st_5","st_6","st_7","st_8","st_9","Ai","STi")
+=======
+#renaming the ugly allele and st columns
+colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tparasites","Infected",	"InfectedBinary", "X", "Orange","Black","site","drainage","sex","length","n.gyros","notes",	"Drainage",	"gt_1","gt_2","gt_3","gt_4","gt_5","gt_6","gt_7","gt_8","gt_9","st_1","st_2","st_3",	"st_4","st_5","st_6","st_7","st_8","st_9","Ai","STi")
+>>>>>>> 0a8f318363f8d5ceb9aefff034b27535f1034af1
 ```
 
 ### Analysis To Do: 
@@ -40,6 +45,7 @@ colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tpar
 
 ##### ST Frequency
 
+<<<<<<< HEAD
 Need to calculate the frequency of each ST (1-15) within each individual.
 
 ```{r ST freq}
@@ -51,6 +57,11 @@ MHCDF_long <- MHCDF %>%
   pivot_longer(cols = gt_1:st_9, names_pattern = "(.t)_(.)", names_to = c('.value','position'), values_drop_na = TRUE)
 
 # next calculate the frequency of each unique supertype
+=======
+Need to calculate the frequency of each ST (1-15) within each individual
+
+```{r ST freq}
+>>>>>>> 0a8f318363f8d5ceb9aefff034b27535f1034af1
 
 ```
 
@@ -115,8 +126,11 @@ coinertia(mhc_r_pca, colour_pca, scannf = TRUE) #manually put in axes number to 
 
 By Predation (MHC-Ar, MHC-STr, Micro-Ar, MHC-ST frequencies; colour area, and Gyrodactylus prevalence)
 
+<<<<<<< HEAD
 Should we use all available data for non colour analyses? Or use the same dataset restricted to 2020 and fish we have colour data for?
 
+=======
+>>>>>>> 0a8f318363f8d5ceb9aefff034b27535f1034af1
 ```{r wilcox prep}
 data_for_analysis <- MHCDF %>% 
   filter(!is.na(Orange) & !is.na(Black)) %>% 
