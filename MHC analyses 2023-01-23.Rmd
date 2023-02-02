@@ -131,6 +131,7 @@ low_pred <- data_for_analysis %>%
 
 
 Actual wilcoxon tests, these are unpaired because we aren't directly comparing the high/low pred sites and include all populations from 2010 (populations without parasites too).
+
 ```{r wilcox predation}
 #not comparing paired high and low so unpaired test
 wil_orange <- wilcox.test(high_pred$Orange, paired = FALSE, alternative = "two.sided")
