@@ -14,16 +14,30 @@ Load packages
 library(car)
 library(tidyverse)
 library(ade4)
+library(stringr)
 ```
 
 Load dataframes
 ```{r load DFs, echo = TRUE}
 rm(list = ls())
+#Colour data
 ColDF <- read.csv("./2013-09-30 MHC_Colour.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
+# Individual immunity data
 MHCDF <- read.csv("./Full DF 2023-01-23.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
+# population immunity data
+PopDF <- read.csv("./microAr 2023-03-16.csv", header = F, row.names = NULL, na.strings = "")
 
 #renaming the allele and st columns for ease of use
 colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tparasites","Infected",	"InfectedBinary", "X", "Orange","Black","site","drainage","sex","length","n.gyros","colour_notes",	"Drainage",	"gt_1","gt_2","gt_3","gt_4","gt_5","gt_6","gt_7","gt_8","gt_9","st_1","st_2","st_3",	"st_4","st_5","st_6","st_7","st_8","st_9","Ai","STi")
+
+#rename and clean Population df from appendix
+colnames(PopDF) <- PopDF[5,] #reassign column names
+PopDF <- PopDF[-(1:5), 1:21 , drop = FALSE] # remove empty rows and colour cols
+PopDF$Site <- str_replace(PopDF$Site, '-', '') # standardise site names
+string_cols <- colnames(PopDF[,2:4])
+PopDF[string_cols] <- lapply(PopDF[string_cols] , factor)
+number_cols <- colnames(PopDF[,c(1,5:21)])
+PopDF[number_cols] <- lapply(PopDF[number_cols] , as.numeric)
 ```
 
 ### Analysis To Do: 
@@ -120,13 +134,20 @@ By Predation (MHC-Ar, MHC-STr, Micro-Ar, MHC-ST frequencies; colour area, and Gy
 Should we use all available data for non colour analyses? Or use the same dataset restricted to 2020 and fish we have colour data for?
 
 ```{r wilcox prep}
-data_for_analysis <- MHCDF %>% 
-  filter(!is.na(Orange) & !is.na(Black)) %>% 
-  filter(Year == 2010 & Sex == 'Male')
-
-high_pred <- data_for_analysis %>% 
+high_pred_pop <- PopDF %>% 
   filter(Predation == 'High')
-low_pred <- data_for_analysis %>% 
+
+low_pred_pop <- PopDF %>% 
+  filter(Predation == 'Low')
+
+high_pred <- MHCDF %>% 
+  filter(!is.na(Orange) & !is.na(Black)) %>% 
+  filter(Year == 2010 & Sex == 'Male') %>% 
+  filter(Predation == 'High')
+
+low_pred <- MHCDF %>% 
+  filter(!is.na(Orange) & !is.na(Black)) %>% 
+  filter(Year == 2010 & Sex == 'Male') %>% 
   filter(Predation == 'Low')
 
 ```
@@ -136,17 +157,39 @@ Actual wilcoxon tests, these are unpaired because we aren't directly comparing t
 
 ```{r wilcox predation}
 #not comparing paired high and low so unpaired test
-wil_orange <- wilcox.test(high_pred$Orange, paired = FALSE, alternative = "two.sided")
-wil_black <- wilcox.test(high_pred$Black, paired = FALSE, alternative = "two.sided")
 
-wil_para <- wilcox.test(high_pred$Tparasites, paired = FALSE, alternative = "two.sided")
+#these three are individual levels
+wil_orange <- wilcox.test(high_pred$Orange, low_pred$Orange, paired = FALSE, alternative = "two.sided")
+wil_black <- wilcox.test(high_pred$Black, low_pred$Black, paired = FALSE, alternative = "two.sided")
 
-wil_all_rich <- wilcox.test(high_pred$Ai, paired = FALSE, alternative = "two.sided")
-wil_st_rich <- wilcox.test(high_pred$STi, paired = FALSE, alternative = "two.sided")
+wil_para <- wilcox.test(high_pred$Tparasites, low_pred$Tparasites, paired = FALSE, alternative = "two.sided")
 
-# Where is Micro-allelic richness data? Am I missing that?
+#population level
+wil_all_rich <- wilcox.test(high_pred$Ai, low_pred$Ai, paired = FALSE, alternative = "two.sided")
+wil_st_rich <- wilcox.test(high_pred$STi, low_pred$STi, paired = FALSE, alternative = "two.sided")
 
 #super type frequencies, all 15? need to calculate the frequencies of each
 
+
+#below have ties, wilcox.test cannot compute exact p-value with ties, try wilcox_test from coin package?
+wil_m_ar <- wilcox.test(high_pred_pop$`Micro-Ar`, low_pred_pop$`Micro-Ar`, paired = FALSE, alternative = "two.sided") # p = 0.010 (like in paper yay!)
+
+wil_para_prev <- wilcox.test(high_pred_pop$`Gyrodactylus prevalence`, low_pred_pop$`Gyrodactylus prevalence`, paired = FALSE, alternative = "two.sided") # p = 0.001 (matches paper)
+```
+
+
+#### Linear models
+
+Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level.
+
+Original Results:
+Linear models showed a significant positive relationship between MHC-Ar and Micro-Ar across all populations (P=0.001, R2=0.41, F=14.18, df=18), suggesting that variation in MHC-Ar is strongly influenced by demographic processes (i.e. genetic drift). In contrast, the relationship between MHC-STr and Micro-Ar among all populations was not significant (P=0.289, R2=0.01, F=1.194, d.f=18)
+
+```{r linear models}
+# p-value? matches (0.001), it's significant
+model_ar <- lm(`Micro-Ar` ~ `MHC-Ar`, data = PopDF)
+
+#p-value? not an exact match but close (0.20), not significant
+model_str <- lm(`Micro-Ar` ~ `MHC-STr`, data = PopDF)
 ```
 
