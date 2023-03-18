@@ -10,23 +10,27 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 Load packages
-```{r load packages, echo = FALSE}
+```{r load packages, echo = FALSE, message = FALSE}
 library(car)
 library(tidyverse)
 library(ade4)
+library(adegraphics)
 library(stringr)
 ```
 
 Load dataframes
 ```{r load DFs, echo = TRUE}
 rm(list = ls())
-#Colour data
-ColDF <- read.csv("./2013-09-30 MHC_Colour.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
+# Original Colour data
+#ColDF <- read.csv("./2013-09-30 MHC_Colour.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
 # Individual immunity data
 MHCDF <- read.csv("./Full DF 2023-01-23.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
 # population immunity data
 PopDF <- read.csv("./microAr 2023-03-16.csv", header = F, row.names = NULL, na.strings = "")
+```
 
+
+```{r clean DFs, echo = FALSE}
 #renaming the allele and st columns for ease of use
 colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tparasites","Infected",	"InfectedBinary", "X", "Orange","Black","site","drainage","sex","length","n.gyros","colour_notes",	"Drainage",	"gt_1","gt_2","gt_3","gt_4","gt_5","gt_6","gt_7","gt_8","gt_9","st_1","st_2","st_3",	"st_4","st_5","st_6","st_7","st_8","st_9","Ai","STi")
 
@@ -34,147 +38,169 @@ colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tpar
 colnames(PopDF) <- PopDF[5,] #reassign column names
 PopDF <- PopDF[-(1:5), 1:21 , drop = FALSE] # remove empty rows and colour cols
 PopDF$Site <- str_replace(PopDF$Site, '-', '') # standardise site names
+PopDF$Site <- str_replace(PopDF$Site, 'El Cedro', 'ElCedro') 
 string_cols <- colnames(PopDF[,2:4])
 PopDF[string_cols] <- lapply(PopDF[string_cols] , factor)
 number_cols <- colnames(PopDF[,c(1,5:21)])
 PopDF[number_cols] <- lapply(PopDF[number_cols] , as.numeric)
+
+#excluding all 2009 guppies because we had unbalanced representation across sites and years
+data_analysis <- MHCDF %>% 
+    filter(!is.na(Orange) & !is.na(Black) & Year == '2010' & Sex == 'Male')
 ```
 
-### Analysis To Do: 
--COIN (In Progress)
-  -prepare all 3 datasets (DONE)   
-  -Run PCAs (DONE)  
-  -bootstrapping, and pearson's correlation coefficient?   
-  -Visualization?   
+We have colour data for `r data_analysis %>% tally() %>% pull()` photos with corresponding MHC data, all photos were taken in 2010. These span `r n_distinct(data_analysis$Site)` sites. Below are the population specific means for relative area of both orange and black.
 
-- Where is the microsatellite richness (micro-Ar), how do I calculate this?  
-- richness linear models (micro-Ar as independent, Ai and STi as dependent)
-- Wilcoxon rank-sum test on all variables by predation level
-- Wilcoxon rank-sum test on all variables by drainage(?) I think we might not want this now
+```{r pop means, echo=FALSE, message = FALSE}
+pop_means <- data_analysis %>% 
+  group_by(Site) %>% 
+  summarize(mean_o = mean(Orange),
+            mean_b = mean(Black)) %>% 
+  add_row(data.frame(Site="All", mean_o=mean(data_analysis$Orange), mean_b=mean(data_analysis$Black)))
 
-##### ST Frequency
+#adding to PopDF, removing populations with no colour data
+PopDF <- inner_join(PopDF, pop_means, by = 'Site')
 
-Need to calculate the frequency of each ST (1-15) within each individual.
+knitr::kable(pop_means, col.names = c("Site", "Mean Relative Orange", "Mean Relative Black"), "simple")
+```
 
-```{r ST freq}
-# first create a long df that's easier to work with
-MHCDF_long <- MHCDF %>% 
+
+```{r st freq data, echo=FALSE, message = FALSE}
+# We found this data in the population level table from Jackie's thesis, but we don't have individual frequencies.
+
+ST_freq <- MHCDF %>% 
   filter(!is.na(Orange) & !is.na(Black)) %>% 
   filter(Year == 2010 & Sex == 'Male') %>% 
   select(-Pred,-X,-site,-sex,-n.gyros) %>% 
-  pivot_longer(cols = gt_1:st_9, names_pattern = "(.t)_(.)", names_to = c('.value','position'), values_drop_na = TRUE)
+  pivot_longer(cols = gt_1:st_9, names_pattern = "(.t)_(.)", names_to = c('.value','position'), values_drop_na = TRUE) %>% 
+  group_by(Fish, st) %>% 
+  summarize(freq = n()) %>% 
+  pivot_wider(names_from = st, values_from = freq, names_sort = TRUE, names_prefix = "ST_freq_") #no ST 10
 
-# next calculate the frequency of each unique supertype
-
-# Need to calculate the frequency of each ST (1-15) within each individual
-
+data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>% 
+  select(Fish:Site, Predation:InfectedBinary, Orange:Black, length, colour_notes, Drainage, Ai:ST_freq_11)
 ```
+
+### Analysis To Do: 
+-COIN (In Progress)   
+  -prepare all 3 datasets (DONE)   
+  -Run PCAs (DONE)  
+  -bootstrapping, and pearson's correlation coefficient?   
+  -Visualization (In progress).  
+
+- ~~Where is the microsatellite richness (micro-Ar), how do I calculate this?~~
+- richness linear models (micro-Ar as independent, Ai and STi as dependent) (DONE)
+- Wilcoxon rank-sum test on all variables by predation level (DONE)
+- Wilcoxon rank-sum test on all variables by drainage(Caroni and North only) *I think we might not want this now?*
+
 
 #### Co-inertia analyses
 
 For coinertia analysis the row weighting must be matched between the two dudi (duality diagrams), so for each pca the rows must indicate the same samples. Using only fish we have both genetic data and patternize colour data for we have N = 193.
 ```{r data prep}
-data_for_analysis <- MHCDF %>% 
-  filter(!is.na(Orange) & !is.na(Black)) %>% 
-  filter(Year == 2010 & Sex == 'Male') 
-#excluding all 2009 guppies because we had unbalanced representation across sites and years
-
 # check for uninfected populations to exclude from analyses between immunity and colour
-no_parasite_sites <- data_for_analysis %>% 
+no_parasite_sites <- data_analysis %>% 
   group_by(Site) %>% 
   summarise(max = max(Tparasites)) %>% 
-  filter(max < 1)
+  filter(max < 1) %>% 
+  pull(Site)
 
-data_for_matrices <- data_for_analysis %>% 
-  filter(!Site %in% no_parasite_sites$Site)
-#Parasite and colour
+data_matrices <-data_analysis %>% 
+  filter(!Site %in% no_parasite_sites) %>% 
+  filter(Site != "ElCedro1") #removed in original study, parasite prev an order of magnitude below others
+
+### Parasite and colour
 #Note: not using InfectedBinary because it should have less explanatory power than Tparasites
 #Should we include body length here?
-colour_matrix <- data_for_matrices %>% 
-  select(Tparasites,Orange:Black) # total parasites, relative body area of each colour (patternize)
+colour_matrix <- data_matrices %>% 
+  select(Tparasites,Orange:Black)
 
-#MHC ST frequency this is wrong, this is not what this is
-#mhc_f_matrix <- data_for_matrices %>% 
-  #select(30:38) %>% # Supertype columns, some have NAs, not all fish have same number of STs
-  #mutate_if(is.numeric, ~replace_na(., 0)) #replace NA with 0 for pca
+### MHC ST frequency
+mhc_f_matrix <- data_matrices %>% 
+  select(ST_freq_1:ST_freq_11) %>% # Supertype columns, some have NAs, not all fish have same number of STs
+  mutate_if(is.numeric, ~replace_na(., 0)) #replace NA with 0 for pca
 
-# allelic richness and ST richness
-mhc_r_matrix <- data_for_matrices %>% 
-  select(Ai, STi) #richness columns, number of different alleles and MHC STs
+### allelic richness and ST richness
+mhc_r_matrix <- data_matrices %>% 
+  select(Ai, STi)
 ```
 
+**COIN(1)**
 
-*COIN(1), 1000 bootstrap replicates??*
+    Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
+    Data matrix (2) contained MHC-ST frequencies for each population
 
-    Data matrix (1) contained MHC-ST frequencies for each population
-    Data matrix (2) contained colour means and Gyrodactylus prevalence for each population
-*COIN(2)*
+**COIN(2)**
 
-    Data matrix (1) contained MHC-Ar, and MHC-STr
-    Data matrix (2) contained colour means and Gyrodactylus prevalence for each population
+    Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
+    Data matrix (2) contained MHC-Ar, and MHC-STr
+
+1000 bootstrap replicates??
 
 ```{r coin}
+# pcas
+pca_colour <- dudi.pca(colour_matrix, scannf = FALSE, nf = 3)
+pca_mhc_f <- dudi.pca(mhc_f_matrix, scannf = FALSE, nf = 3)
+pca_mhc_r <- dudi.pca(mhc_r_matrix, scannf = FALSE, nf = 3)
+
 #COIN 1 - colour and MHC ST frequency
-colour_pca <- dudi.pca(colour_matrix, scannf = FALSE, nf = 3)
-#mhc_f_pca <- dudi.pca(mhc_f_matrix, scannf = FALSE, nf = 3)
+coin_1 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_f, scannf = FALSE, nf = 3) #manually put in axes number to keep? 2?
 
-#coinertia(mhc_f_pca, colour_pca, scannf = TRUE) #manually put in axes number to keep? 2?
+#COIN 2 - colour and allelic richness
+coin_2 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_r, scannf = FALSE, nf = 3) #manually put in axes number to keep? 2?
+```
 
-#COIN 2 - colour and MHC ST and allelic richness
-mhc_r_pca <- dudi.pca(mhc_r_matrix, scannf = FALSE, nf = 3)
+The coin visualization is a work in progress...   
+We will need to recreate the plots in the original paper to make sure they all match our data and so we can provide the source code.
+```{r coin plots}
+# coin 1
+g6 <- s.arrow(coin_2$l1, plab.cex = 0.7)
+g7 <- s.arrow(coin_2$c1, plab.cex = 0.7)
+g8 <- s.corcircle(coin_2$aX, plot = FALSE)
+g9 <- s.corcircle(coin_2$aY, plot = FALSE)
+cbindADEg(g8, g9, plot = TRUE)
+g10 <- plot(coin_2)
 
-coinertia(mhc_r_pca, colour_pca, scannf = TRUE) #manually put in axes number to keep? 2?
+# coin 2
+g1 <- s.arrow(coin_1$l1, plab.cex = 0.7)
+g2 <- s.arrow(coin_1$c1, plab.cex = 0.7)
+g3 <- s.corcircle(coin_1$aX, plot = FALSE)
+g4 <- s.corcircle(coin_1$aY, plot = FALSE)
+cbindADEg(g3, g4, plot = TRUE)
+g5 <- plot(coin_1)
 ```
 
 
 #### Wilcoxon Rank tests
 
-By Predation (MHC-Ar, MHC-STr, Micro-Ar, MHC-ST frequencies; colour area, and Gyrodactylus prevalence)
+By Predation (MHC-Ar, MHC-STr, Micro-Ar, MHC-ST frequencies; colour area, and Gyrodactylus prevalence).
 
-Should we use all available data for non colour analyses? Or use the same dataset restricted to 2020 and fish we have colour data for?
-
-```{r wilcox prep}
-high_pred_pop <- PopDF %>% 
-  filter(Predation == 'High')
-
-low_pred_pop <- PopDF %>% 
-  filter(Predation == 'Low')
-
-high_pred <- MHCDF %>% 
-  filter(!is.na(Orange) & !is.na(Black)) %>% 
-  filter(Year == 2010 & Sex == 'Male') %>% 
-  filter(Predation == 'High')
-
-low_pred <- MHCDF %>% 
-  filter(!is.na(Orange) & !is.na(Black)) %>% 
-  filter(Year == 2010 & Sex == 'Male') %>% 
-  filter(Predation == 'Low')
-
-```
-
-
-Actual wilcoxon tests, these are unpaired because we aren't directly comparing the high/low pred sites and include all populations from 2010 (populations without parasites too).
+These Wilcox tests are unpaired because we aren't directly comparing the high/low pred sites and include all populations from 2010 with both colour and MHC data at population level (N = 19, populations without parasites included).
 
 ```{r wilcox predation}
-#not comparing paired high and low so unpaired test
+#specific checks to see if the data matches the paper
+#wil_m_ar <- wilcox.test(high_pred_pop$`Micro-Ar`, low_pred_pop$`Micro-Ar`, paired = FALSE, alternative = "two.sided") # p = 0.010 (like in paper yay!)
 
-#these three are individual levels
-wil_orange <- wilcox.test(high_pred$Orange, low_pred$Orange, paired = FALSE, alternative = "two.sided")
-wil_black <- wilcox.test(high_pred$Black, low_pred$Black, paired = FALSE, alternative = "two.sided")
+#wil_para_prev <- wilcox.test(high_pred_pop$`Gyrodactylus prevalence`, low_pred_pop$`Gyrodactylus prevalence`, paired = FALSE, alternative = "two.sided") # p = 0.001 (matches paper)
 
-wil_para <- wilcox.test(high_pred$Tparasites, low_pred$Tparasites, paired = FALSE, alternative = "two.sided")
+wilcoxPred <- function(df, col) {
+  stopifnot(typeof(col) == "character")
+  wilcox.test(df[df$Predation == "High", col], df[df$Predation == "Low",col], paired = FALSE, alternative = "two.sided")
+}
 
-#population level
-wil_all_rich <- wilcox.test(high_pred$Ai, low_pred$Ai, paired = FALSE, alternative = "two.sided")
-wil_st_rich <- wilcox.test(high_pred$STi, low_pred$STi, paired = FALSE, alternative = "two.sided")
+test_result <- wilcoxPred(PopDF, "mean_o")
 
-#super type frequencies, all 15? need to calculate the frequencies of each
+wilcox_output = list()
+for (column in colnames(PopDF[,6:23])) {
+  test_results <- wilcoxPred(PopDF, column)
+  test_results["data.name"] <- column
+  print(test_results)
+  wilcox_output[[length(wilcox_output)+1]] <- test_results
+  #names(wilcox_output)[column] <- names(column)
+}
 
-
-#below have ties, wilcox.test cannot compute exact p-value with ties, try wilcox_test from coin package?
-wil_m_ar <- wilcox.test(high_pred_pop$`Micro-Ar`, low_pred_pop$`Micro-Ar`, paired = FALSE, alternative = "two.sided") # p = 0.010 (like in paper yay!)
-
-wil_para_prev <- wilcox.test(high_pred_pop$`Gyrodactylus prevalence`, low_pred_pop$`Gyrodactylus prevalence`, paired = FALSE, alternative = "two.sided") # p = 0.001 (matches paper)
+names(wilcox_output) <- colnames(PopDF[,6:23])
+#some have ties, wilcox.test cannot compute exact p-value with ties, try wilcox_test from coin package?
 ```
 
 
@@ -183,13 +209,17 @@ wil_para_prev <- wilcox.test(high_pred_pop$`Gyrodactylus prevalence`, low_pred_p
 Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level.
 
 Original Results:
-Linear models showed a significant positive relationship between MHC-Ar and Micro-Ar across all populations (P=0.001, R2=0.41, F=14.18, df=18), suggesting that variation in MHC-Ar is strongly influenced by demographic processes (i.e. genetic drift). In contrast, the relationship between MHC-STr and Micro-Ar among all populations was not significant (P=0.289, R2=0.01, F=1.194, d.f=18)
+"Linear models showed a significant positive relationship between MHC-Ar and Micro-Ar across all populations (P=0.001, R2=0.41, F=14.18, df=18), suggesting that variation in MHC-Ar is strongly influenced by demographic processes (i.e. genetic drift). In contrast, the relationship between MHC-STr and Micro-Ar among all populations was not significant (P=0.289, R2=0.01, F=1.194, d.f=18)"
 
 ```{r linear models}
-# p-value? matches (0.001), it's significant
+# p-value? matches (paper = 0.001), it's significant
 model_ar <- lm(`Micro-Ar` ~ `MHC-Ar`, data = PopDF)
+summary(model_ar)
 
-#p-value? not an exact match but close (0.20), not significant
+#p-value? not an exact match (paper = 0.289), not significant
+#this was 0.20 (much closer to original) before I excluded the fish we didn't ahve colour data for
 model_str <- lm(`Micro-Ar` ~ `MHC-STr`, data = PopDF)
+summary(model_str)
 ```
 
+####
