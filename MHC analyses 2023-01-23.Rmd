@@ -16,6 +16,7 @@ library(tidyverse)
 library(ade4)
 library(adegraphics)
 library(stringr)
+library(corrplot)
 ```
 
 Load dataframes
@@ -85,14 +86,18 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 -COIN (In Progress)   
   -prepare all 3 datasets (DONE)   
   -Run PCAs (DONE)  
-  -bootstrapping, and pearson's correlation coefficient?   
-  -Visualization (In progress).  
+  -bootstrapping for COIN - before pca step?   
+  -pearson's correlation coefficient?    
+  -Visualization (In progress)  
 
-- ~~Where is the microsatellite richness (micro-Ar), how do I calculate this?~~
 - richness linear models (micro-Ar as independent, Ai and STi as dependent) (DONE)
 - Wilcoxon rank-sum test on all variables by predation level (DONE)
-- Wilcoxon rank-sum test on all variables by drainage(Caroni and North only) *I think we might not want this now?*
+- Wilcoxon rank-sum test on all variables by drainage (Caroni and North only) *I think we might not want this now?*
 
+*Reviewers Comments*
+They mentioned replicating analyses with both drainages separately so we can confirm trends cross drainages   
+Why use parametric and non-parametric tests?   
+Adding in the data from the different years too (which we have done)   
 
 #### Co-inertia analyses
 
@@ -135,39 +140,49 @@ mhc_r_matrix <- data_matrices %>%
     Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
     Data matrix (2) contained MHC-Ar, and MHC-STr
 
-1000 bootstrap replicates??
+1000 bootstrap replicates??   
+"A PCA was conducted on each data matrix (1 and 2), and COIN (COIN1) assessed the global variation among PCA axes between the PCA outputs for data matrix 1 and 2, using 1000 bootstrap replicates. Where a strong correlation was indicated between individual traits of interest, a separate one-tailed Pearson’s correlation coefficient (PCC) was calculated."
+
+bootstrap replication - random sample with replacement from the population's PC values 1000 times to create a larger sample for the COIN?
+PCC - look at correlations between all traits? Jackie only looked at specific comparisons
 
 ```{r coin}
-# pcas
+# pcas, currently keeping all factors
 pca_colour <- dudi.pca(colour_matrix, scannf = FALSE, nf = 3)
-pca_mhc_f <- dudi.pca(mhc_f_matrix, scannf = FALSE, nf = 3)
-pca_mhc_r <- dudi.pca(mhc_r_matrix, scannf = FALSE, nf = 3)
+pca_mhc_f <- dudi.pca(mhc_f_matrix, scannf = FALSE, nf = 10)
+pca_mhc_r <- dudi.pca(mhc_r_matrix, scannf = FALSE, nf = 2)
+
+# for both COIN analyses the screeplot indicates only the first factor is significantly contributing, should we only keep 1?
 
 #COIN 1 - colour and MHC ST frequency
-coin_1 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_f, scannf = FALSE, nf = 3) #manually put in axes number to keep? 2?
+coin_1 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_f, scannf = FALSE, nf = 2) #manually put axes to keep
 
 #COIN 2 - colour and allelic richness
-coin_2 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_r, scannf = FALSE, nf = 3) #manually put in axes number to keep? 2?
+coin_2 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_r, scannf = FALSE, nf = 2) #manually put axes to keep
+
+#correlation plot with matrices, for curiosity
+#correlations <- cor(cbind(colour_matrix, mhc_f_matrix, mhc_r_matrix))
+#corrplot(correlations , method = 'number')
 ```
 
 The coin visualization is a work in progress...   
 We will need to recreate the plots in the original paper to make sure they all match our data and so we can provide the source code.
 ```{r coin plots}
 # coin 1
-g6 <- s.arrow(coin_2$l1, plab.cex = 0.7)
-g7 <- s.arrow(coin_2$c1, plab.cex = 0.7)
-g8 <- s.corcircle(coin_2$aX, plot = FALSE)
-g9 <- s.corcircle(coin_2$aY, plot = FALSE)
-cbindADEg(g8, g9, plot = TRUE)
-g10 <- plot(coin_2)
-
-# coin 2
 g1 <- s.arrow(coin_1$l1, plab.cex = 0.7)
 g2 <- s.arrow(coin_1$c1, plab.cex = 0.7)
 g3 <- s.corcircle(coin_1$aX, plot = FALSE)
 g4 <- s.corcircle(coin_1$aY, plot = FALSE)
 cbindADEg(g3, g4, plot = TRUE)
 g5 <- plot(coin_1)
+
+# coin 2
+g6 <- s.arrow(coin_2$l1, plab.cex = 0.7)
+g7 <- s.arrow(coin_2$c1, plab.cex = 0.7)
+g8 <- s.corcircle(coin_2$aX, plot = FALSE)
+g9 <- s.corcircle(coin_2$aY, plot = FALSE)
+cbindADEg(g8, g9, plot = TRUE)
+g10 <- plot(coin_2)
 ```
 
 
