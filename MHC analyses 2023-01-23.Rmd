@@ -166,9 +166,16 @@ plot(rv1) # simulated p = 0.001
 rv2 <- RV.rtest(pca_colour$tab, pca_mhc_r$tab, 1000)
 plot(rv2) # simulated p = 0.374
 
-#correlation plot with matrices, for curiosity
-#correlations <- cor(cbind(colour_matrix, mhc_f_matrix, mhc_r_matrix))
-#corrplot(correlations , method = 'number')
+#correlation plot with matrices to look at what to test with a PCC?
+correlations <- cor(cbind(colour_matrix, mhc_f_matrix, mhc_r_matrix))
+corrplot(correlations , method = 'number')
+
+#using 0.20 as a cutoff, St freq 8,11,3,1 vs orange
+# none are significant, I am not sure if this is replicating what Jackie did
+PCC_1 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_1, method = "pearson")
+PCC_3 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_3, method = "pearson")
+PCC_8 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_8, method = "pearson")
+PCC_11 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_11, method = "pearson")
 ```
 
 The coin visualization is a work in progress...   
