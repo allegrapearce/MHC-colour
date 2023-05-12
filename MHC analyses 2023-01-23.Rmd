@@ -19,6 +19,7 @@ library(stringr)
 library(corrplot)
 ```
 
+### Data Prep
 Load dataframes
 ```{r load DFs, echo = TRUE}
 rm(list = ls())
@@ -83,21 +84,23 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 ```
 
 ### Analysis To Do: 
--COIN (In Progress)   
+Original Analysis
+-COIA (In Progress)   
   -prepare all 3 datasets (DONE)   
   -Run PCAs (DONE)  
-  -bootstrapping for COIN to test significance (DONE) 
-  -pearson's correlation coefficient test (DONE...maybe?) 
+  -bootstrapping for COIA to test significance (DONE) 
+  -pearson's correlation coefficient test
   -Visualization (In progress)  
 
 - richness linear models (micro-Ar as independent, Ai and STi as dependent) (DONE)
 - Wilcoxon rank-sum test on all variables by predation level (DONE)
-- Wilcoxon rank-sum test on all variables by drainage (Caroni and North only) *I think we might not want this now?*
+- Wilcoxon rank-sum test on all variables by drainage (DONE Caroni and North only)*I think we might not want this now?*
 
 *Reviewers Comments*
 They mentioned replicating analyses with both drainages separately so we can confirm trends across drainages   
 Why use parametric and non-parametric tests?   
 Adding in the data from the different years too (which we have done)   
+Changing to Individual level analyses to leverage the new data   
 
 #### Co-inertia analyses
 
@@ -130,22 +133,22 @@ mhc_r_matrix <- data_matrices %>%
   select(Ai, STi)
 ```
 
-**COIN(1)**
+**COIA(1)**
 
     Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
     Data matrix (2) contained MHC-ST frequencies for each population
 
-**COIN(2)**
+**COIA(2)**
 
     Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
     Data matrix (2) contained MHC-Ar, and MHC-STr
 
 
-```{r coin}
+```{r coia}
 # pcas, currently keeping all factors
-pca_colour <- dudi.pca(colour_matrix, scannf = FALSE, nf = 3)
-pca_mhc_f <- dudi.pca(mhc_f_matrix, scannf = FALSE, nf = 10)
-pca_mhc_r <- dudi.pca(mhc_r_matrix, scannf = FALSE, nf = 2)
+pca_colour <- dudi.pca(colour_matrix, scale = TRUE, scannf = FALSE, nf = 3) # because parasite counts and relative area have different scales
+pca_mhc_f <- dudi.pca(mhc_f_matrix, scale = FALSE, scannf = FALSE, nf = 10) #same scale
+pca_mhc_r <- dudi.pca(mhc_r_matrix, scale = FALSE, scannf = FALSE, nf = 2) #same scale
 
 # for both COIN analyses the screeplot indicates only the first factor is significantly contributing, should we only keep 1?
 
@@ -157,10 +160,10 @@ coin_2 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_r, scannf = FALSE, nf = 
 
 #permutation test
 rv1 <- RV.rtest(pca_colour$tab, pca_mhc_f$tab, 1000)
-plot(rv1) # simulated p = 0.001
+plot(rv1) # simulated p = 0.001, RV = 0.11
 
 rv2 <- RV.rtest(pca_colour$tab, pca_mhc_r$tab, 1000)
-plot(rv2) # simulated p = 0.374
+plot(rv2) # simulated p = 0.374, RV = 0.014
 
 #correlation plot with matrices to look at what to test with a PCC?
 correlations <- cor(cbind(colour_matrix, mhc_f_matrix, mhc_r_matrix))
@@ -225,25 +228,48 @@ for (column in colnames(PopDF[,6:23])) {
 
 names(wilcox_output) <- colnames(PopDF[,6:23])
 #some have ties, wilcox.test cannot compute exact p-value with ties, try wilcox_test from coin package?
+
+# by drainage
+wilcoxDrain <- function(df, col) {
+  stopifnot(typeof(col) == "character")
+  wilcox.test(df[df$Drainage == "North Slope", col], df[df$Drainage == "Caroni",col], paired = FALSE, alternative = "two.sided")
+}
+
+test_result <- wilcoxDrain(PopDF, "mean_o")
+
+wilcox_output_d = list()
+for (column in colnames(PopDF[,6:23])) {
+  test_results <- wilcoxDrain(PopDF, column)
+  test_results["data.name"] <- column
+  print(test_results)
+  wilcox_output_d[[length(wilcox_output_d)+1]] <- test_results
+  #names(wilcox_output)[column] <- names(column)
+}
+
+names(wilcox_output_d) <- colnames(PopDF[,6:23])
 ```
 
 
-#### Linear models
+#### Linear models for population level
 
 Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level.
+These cannot be made individual level due to Microsatellite Ar being population level
 
 Original Results:
 "Linear models showed a significant positive relationship between MHC-Ar and Micro-Ar across all populations (P=0.001, R2=0.41, F=14.18, df=18), suggesting that variation in MHC-Ar is strongly influenced by demographic processes (i.e. genetic drift). In contrast, the relationship between MHC-STr and Micro-Ar among all populations was not significant (P=0.289, R2=0.01, F=1.194, d.f=18)"
 
 ```{r linear models}
-# p-value? matches (paper = 0.001), it's significant
+# p=0.0006 matches (paper = 0.001), it's significant
 model_ar <- lm(`Micro-Ar` ~ `MHC-Ar`, data = PopDF)
 summary(model_ar)
 
-#p-value? not an exact match (paper = 0.289), not significant
-#this was 0.20 (much closer to original) before I excluded the fish we didn't ahve colour data for
+#p=0.06 not an exact match (paper = 0.289), not significant
+#this was 0.20 (much closer to original) before I excluded the fish we didn't have colour data for
 model_str <- lm(`Micro-Ar` ~ `MHC-STr`, data = PopDF)
 summary(model_str)
 ```
 
-####
+
+### Figures
+
+###
