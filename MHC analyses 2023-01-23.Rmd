@@ -83,10 +83,10 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 ```
 
 ### Analysis To Do: 
--COIN (In Progress)   
+-COIA (In Progress)   
   -prepare all 3 datasets (DONE)   
   -Run PCAs (DONE)  
-  -bootstrapping for COIN to test significance (DONE) 
+  -bootstrapping for COIA to test significance (DONE) 
   -pearson's correlation coefficient test (DONE...maybe?) 
   -Visualization (In progress)  
 
@@ -130,22 +130,22 @@ mhc_r_matrix <- data_matrices %>%
   select(Ai, STi)
 ```
 
-**COIN(1)**
+**COIA(1)**
 
     Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
     Data matrix (2) contained MHC-ST frequencies for each population
 
-**COIN(2)**
+**COIA(2)**
 
     Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
     Data matrix (2) contained MHC-Ar, and MHC-STr
 
 
-```{r coin}
+```{r coia}
 # pcas, currently keeping all factors
-pca_colour <- dudi.pca(colour_matrix, scannf = FALSE, nf = 3)
-pca_mhc_f <- dudi.pca(mhc_f_matrix, scannf = FALSE, nf = 10)
-pca_mhc_r <- dudi.pca(mhc_r_matrix, scannf = FALSE, nf = 2)
+pca_colour <- dudi.pca(colour_matrix, scale = TRUE, scannf = FALSE, nf = 3) # because parasite counts and relative area have different scales
+pca_mhc_f <- dudi.pca(mhc_f_matrix, scale = FALSE, scannf = FALSE, nf = 10) #same scale
+pca_mhc_r <- dudi.pca(mhc_r_matrix, scale = FALSE, scannf = FALSE, nf = 2) #same scale
 
 # for both COIN analyses the screeplot indicates only the first factor is significantly contributing, should we only keep 1?
 
@@ -157,10 +157,10 @@ coin_2 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_r, scannf = FALSE, nf = 
 
 #permutation test
 rv1 <- RV.rtest(pca_colour$tab, pca_mhc_f$tab, 1000)
-plot(rv1) # simulated p = 0.001
+plot(rv1) # simulated p = 0.001, RV = 0.11
 
 rv2 <- RV.rtest(pca_colour$tab, pca_mhc_r$tab, 1000)
-plot(rv2) # simulated p = 0.374
+plot(rv2) # simulated p = 0.374, RV = 0.014
 
 #correlation plot with matrices to look at what to test with a PCC?
 correlations <- cor(cbind(colour_matrix, mhc_f_matrix, mhc_r_matrix))
@@ -225,6 +225,25 @@ for (column in colnames(PopDF[,6:23])) {
 
 names(wilcox_output) <- colnames(PopDF[,6:23])
 #some have ties, wilcox.test cannot compute exact p-value with ties, try wilcox_test from coin package?
+
+# by drainage
+wilcoxDrain <- function(df, col) {
+  stopifnot(typeof(col) == "character")
+  wilcox.test(df[df$Drainage == "North Slope", col], df[df$Drainage == "Caroni",col], paired = FALSE, alternative = "two.sided")
+}
+
+test_result <- wilcoxDrain(PopDF, "mean_o")
+
+wilcox_output_d = list()
+for (column in colnames(PopDF[,6:23])) {
+  test_results <- wilcoxDrain(PopDF, column)
+  test_results["data.name"] <- column
+  print(test_results)
+  wilcox_output_d[[length(wilcox_output_d)+1]] <- test_results
+  #names(wilcox_output)[column] <- names(column)
+}
+
+names(wilcox_output_d) <- colnames(PopDF[,6:23])
 ```
 
 
