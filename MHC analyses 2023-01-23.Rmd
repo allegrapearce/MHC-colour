@@ -86,8 +86,8 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 -COIN (In Progress)   
   -prepare all 3 datasets (DONE)   
   -Run PCAs (DONE)  
-  -bootstrapping for COIN - before pca step?   
-  -pearson's correlation coefficient?    
+  -bootstrapping for COIN to test significance (DONE) 
+  -pearson's correlation coefficient? where???????    
   -Visualization (In progress)  
 
 - richness linear models (micro-Ar as independent, Ai and STi as dependent) (DONE)
@@ -141,9 +141,8 @@ mhc_r_matrix <- data_matrices %>%
     Data matrix (2) contained MHC-Ar, and MHC-STr
 
 1000 bootstrap replicates??   
-"A PCA was conducted on each data matrix (1 and 2), and COIN (COIN1) assessed the global variation among PCA axes between the PCA outputs for data matrix 1 and 2, using 1000 bootstrap replicates. Where a strong correlation was indicated between individual traits of interest, a separate one-tailed Pearson’s correlation coefficient (PCC) was calculated."
+"Where a strong correlation was indicated between individual traits of interest, a separate one-tailed Pearson’s correlation coefficient (PCC) was calculated."
 
-bootstrap replication - random sample with replacement from the population's PC values 1000 times to create a larger sample for the COIN?
 PCC - look at correlations between all traits? Jackie only looked at specific comparisons
 
 ```{r coin}
@@ -159,6 +158,13 @@ coin_1 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_f, scannf = FALSE, nf = 
 
 #COIN 2 - colour and allelic richness
 coin_2 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_r, scannf = FALSE, nf = 2) #manually put axes to keep
+
+#permutation test
+rv1 <- RV.rtest(pca_colour$tab, pca_mhc_f$tab, 1000)
+plot(rv1) # simulated p = 0.001
+
+rv2 <- RV.rtest(pca_colour$tab, pca_mhc_r$tab, 1000)
+plot(rv2) # simulated p = 0.374
 
 #correlation plot with matrices, for curiosity
 #correlations <- cor(cbind(colour_matrix, mhc_f_matrix, mhc_r_matrix))
