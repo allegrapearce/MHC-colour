@@ -87,7 +87,7 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
   -prepare all 3 datasets (DONE)   
   -Run PCAs (DONE)  
   -bootstrapping for COIN to test significance (DONE) 
-  -pearson's correlation coefficient? where???????    
+  -pearson's correlation coefficient test (DONE...maybe?) 
   -Visualization (In progress)  
 
 - richness linear models (micro-Ar as independent, Ai and STi as dependent) (DONE)
@@ -95,7 +95,7 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 - Wilcoxon rank-sum test on all variables by drainage (Caroni and North only) *I think we might not want this now?*
 
 *Reviewers Comments*
-They mentioned replicating analyses with both drainages separately so we can confirm trends cross drainages   
+They mentioned replicating analyses with both drainages separately so we can confirm trends across drainages   
 Why use parametric and non-parametric tests?   
 Adding in the data from the different years too (which we have done)   
 
@@ -140,10 +140,6 @@ mhc_r_matrix <- data_matrices %>%
     Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
     Data matrix (2) contained MHC-Ar, and MHC-STr
 
-1000 bootstrap replicates??   
-"Where a strong correlation was indicated between individual traits of interest, a separate one-tailed Pearson’s correlation coefficient (PCC) was calculated."
-
-PCC - look at correlations between all traits? Jackie only looked at specific comparisons
 
 ```{r coin}
 # pcas, currently keeping all factors
@@ -166,9 +162,16 @@ plot(rv1) # simulated p = 0.001
 rv2 <- RV.rtest(pca_colour$tab, pca_mhc_r$tab, 1000)
 plot(rv2) # simulated p = 0.374
 
-#correlation plot with matrices, for curiosity
-#correlations <- cor(cbind(colour_matrix, mhc_f_matrix, mhc_r_matrix))
-#corrplot(correlations , method = 'number')
+#correlation plot with matrices to look at what to test with a PCC?
+correlations <- cor(cbind(colour_matrix, mhc_f_matrix, mhc_r_matrix))
+corrplot(correlations , method = 'number')
+
+#using 0.20 as a cutoff, St freq 8,11,3,1 vs orange
+# none are significant, I am not sure if this is replicating what Jackie did
+PCC_1 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_1, method = "pearson")
+PCC_3 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_3, method = "pearson")
+PCC_8 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_8, method = "pearson")
+PCC_11 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_11, method = "pearson")
 ```
 
 The coin visualization is a work in progress...   
