@@ -84,12 +84,12 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 ```
 
 ### Analysis To Do: 
-Original Analysis
+Original Analysis   
 -COIA (In Progress)   
   -prepare all 3 datasets (DONE)   
   -Run PCAs (DONE)  
   -bootstrapping for COIA to test significance (DONE) 
-  -pearson's correlation coefficient test
+  -pearson's correlation coefficient test   
   -Visualization (In progress)  
 
 - richness linear models (micro-Ar as independent, Ai and STi as dependent) (DONE)
