@@ -17,6 +17,7 @@ library(ade4)
 library(adegraphics)
 library(stringr)
 library(corrplot)
+library(lmerTest)
 ```
 
 ### Data Prep
@@ -26,7 +27,7 @@ rm(list = ls())
 # Original Colour data
 #ColDF <- read.csv("./2013-09-30 MHC_Colour.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
 # Individual immunity data
-MHCDF <- read.csv("./Full DF 2023-01-23.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
+MHCDF <- read.csv("./Full DF 2023-10-20.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
 # population immunity data
 PopDF <- read.csv("./microAr 2023-03-16.csv", header = F, row.names = NULL, na.strings = "")
 ```
@@ -34,7 +35,9 @@ PopDF <- read.csv("./microAr 2023-03-16.csv", header = F, row.names = NULL, na.s
 
 ```{r clean DFs, echo = FALSE}
 #renaming the allele and st columns for ease of use
-colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tparasites","Infected",	"InfectedBinary", "X", "Orange","Black","site","drainage","sex","length","n.gyros","colour_notes",	"Drainage",	"gt_1","gt_2","gt_3","gt_4","gt_5","gt_6","gt_7","gt_8","gt_9","st_1","st_2","st_3",	"st_4","st_5","st_6","st_7","st_8","st_9","Ai","STi")
+colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tparasites","Infected",	"InfectedBinary", "Orange","Black","site","drainage","sex","length","n.gyros","colour_notes",	"Drainage",	"gt_1","gt_2","gt_3","gt_4","gt_5","gt_6","gt_7","gt_8","gt_9","st_1","st_2","st_3",	"st_4","st_5","st_6","st_7","st_8","st_9","Ai","STi")
+
+MHCDF$Drainage <- as.factor(str_replace(MHCDF$Drainage, 'North slope', 'North Slope'))
 
 #rename and clean Population df from appendix
 colnames(PopDF) <- PopDF[5,] #reassign column names
@@ -73,14 +76,14 @@ knitr::kable(pop_means, col.names = c("Site", "Mean Relative Orange", "Mean Rela
 ST_freq <- MHCDF %>% 
   filter(!is.na(Orange) & !is.na(Black)) %>% 
   filter(Year == 2010 & Sex == 'Male') %>% 
-  select(-Pred,-X,-site,-sex,-n.gyros) %>% 
+  select(-Pred,-site,-sex,-n.gyros) %>% 
   pivot_longer(cols = gt_1:st_9, names_pattern = "(.t)_(.)", names_to = c('.value','position'), values_drop_na = TRUE) %>% 
   group_by(Fish, st) %>% 
   summarize(freq = n()) %>% 
   pivot_wider(names_from = st, values_from = freq, names_sort = TRUE, names_prefix = "ST_freq_") #no ST 10
 
 data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>% 
-  select(Fish:Site, Predation:InfectedBinary, Orange:Black, length, colour_notes, Drainage, Ai:ST_freq_11)
+  select(Fish:Site, Predation:InfectedBinary, Orange:Black, length, colour_notes, Drainage, Ai:ST_freq_15)
 ```
 
 
@@ -98,7 +101,7 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 
 * Changing to Individual level analyses to leverage the new data   
   + COIA (DONE)   
-  + Wilcoxon - change to models with individual data   
+  + Wilcoxon - change to models with individual data (DONE)   
   + Microsatellite - dependent on whether we have individual microsat data   
 
 ### Analysis To Do: 
@@ -260,11 +263,18 @@ names(wilcox_output_d) <- colnames(PopDF[,6:23])
 
 
 Move to linear mixed models that control for both predation and drainage.   
-We could use wilcoxon with individual level data, but we have mroe than two drainages so I don't think it's appropriate anymore.   
+We could use wilcoxon with individual level data, but we have more than two drainages so I don't think it's appropriate anymore. (Not in MS currently)   
 
 These give information on differences in traits of interest (colour, parasite, MHC) between key ecological variables (predation and drainage).   
+I've done these up for now but have no done model valiadation or interpretation.   
 ```{r individual level drainage and predation impact}
+model_o <- lmer(Orange ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_b <- lmer(Black ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_para <- lmer(Tparasites ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_mhcSTr <- lmer(STi ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_mhcAr <- lmer(Ai ~ Predation + Drainage + (1|Site), data = data_analysis)
 
+## Cannot do individual level microsatellite data, and population means are of more interest? We only have population estimates of Microstellite richness
 ```
 
 #### Linear models for population level
@@ -272,17 +282,16 @@ These give information on differences in traits of interest (colour, parasite, M
 Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level.
 These could potentially be made individual level if we have individual microsatellite data if we want to.   
 
-Original Results:
+Results:
 MHC-Ar, significant like original work
-MHC-STr, insignificant in original work, now 0.06 (marginally significant?)
+MHC-STr, insignificant like original work
 
 ```{r linear models}
 # p=0.0006 matches (paper = 0.001), it's significant
 model_ar <- lm(`Micro-Ar` ~ `MHC-Ar`, data = PopDF)
 summary(model_ar)
 
-#p=0.06 not an exact match (paper = 0.289), not significant
-#this was 0.20 (much closer to original) before I excluded the fish we didn't have colour data for
+#p=0.12 not an exact match (paper = 0.289), not significant
 model_str <- lm(`Micro-Ar` ~ `MHC-STr`, data = PopDF)
 summary(model_str)
 ```
