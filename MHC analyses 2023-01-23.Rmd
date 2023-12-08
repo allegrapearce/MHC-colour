@@ -262,19 +262,58 @@ names(wilcox_output_d) <- colnames(PopDF[,6:23])
 ```
 
 
-Move to linear mixed models that control for both predation and drainage.   
-We could use wilcoxon with individual level data, but we have more than two drainages so I don't think it's appropriate anymore. (Not in MS currently)   
+#### Individual level mixed models
 
-These give information on differences in traits of interest (colour, parasite, MHC) between key ecological variables (predation and drainage).   
-I've done these up for now but have no done model valiadation or interpretation.   
-```{r individual level drainage and predation impact}
-model_o <- lmer(Orange ~ Predation + Drainage + (1|Site), data = data_analysis)
-model_b <- lmer(Black ~ Predation + Drainage + (1|Site), data = data_analysis)
-model_para <- lmer(Tparasites ~ Predation + Drainage + (1|Site), data = data_analysis)
-model_mhcSTr <- lmer(STi ~ Predation + Drainage + (1|Site), data = data_analysis)
-model_mhcAr <- lmer(Ai ~ Predation + Drainage + (1|Site), data = data_analysis)
+Move to linear mixed models that control for both predation and drainage, these are just updated versions of the wilcoxon. However, we can do something nicer with a mixed model (second chunk).      
+(Not in MS currently)   
 
-## Cannot do individual level microsatellite data, and population means are of more interest? We only have population estimates of Microstellite richness
+```{r individual level drainage and predation only, include=FALSE, eval=FALSE}
+#these are analagous to the wilcox, however we can do better, not currently used or run in this file
+model_o_simple <- lmer(Orange ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_b_simple <- lmer(Black ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_para_simple <- lmer(Tparasites ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_mhcSTr_simple <- lmer(STi ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_mhcAr_simple <- lmer(Ai ~ Predation + Drainage + (1|Site), data = data_analysis)
+```
+
+These give information on differences in traits of interest (colour, parasite, MHC) between key  variables (MHC, predation, and drainage).   
+I've done these up for now but have not done model valiadation or interpretation.
+
+Cannot do individual level microsatellite data, and population means are of more interest? We only have population estimates of Microstellite richness
+
+*make 3 models, orange, black, and parasite as responses (MHCSTr, MHCAr, MHCSTfreq, Pred as fixes, and random with site nested within drainage)*
+```{r individual level model orange, eval = FALSE}
+#how to add all the ST freq variables?????
+# GLM with binomial dist? data looks left skewed and is bounded between 0 and 1
+model_o <- glmer(Orange ~ Tparasites + STi + Ai + Predation + (1|Site/Drainage), data = data_analysis, family =  binomial) #singular
+
+#tried allFit(), no optimizers work, additionally tried different random factor structure
+#STi and Ai are highly correlated so go forward with one in the model
+#How do we do ST frequency??? PCA?
+
+model_o1 <- glmer(Orange ~ STi + Predation + (1|Site), data = data_analysis, family =  binomial)
+
+model_o2 <- glmer(Orange ~ Tparasites + STi + Ai + Predation + (1|Site) + (1|Drainage), data = data_analysis, family =  binomial) #also singular
+
+model_o3 <- glmer(Orange ~ Tparasites + STi + Ai + Predation + (1|Site), data = data_analysis, family =  binomial) #also singular
+
+model_o4 <- glm(Orange ~ Tparasites + STi + Ai + Predation, data = data_analysis, family =  binomial) 
+
+plot(model_o)
+```
+
+
+```{r individual model black, eval = FALSE}
+#Normally distributed?? Or binomial since it's bounded between 0 and 1?
+model_b <- glmer(Black ~ Tparasites + STi + Ai + Predation + Drainage + (1|Site/Drainage), data = data_analysis, family = binomial)
+```
+
+
+```{r individual model parasites, eval = FALSE}
+#Poisson dist, if overdispersed use negative binomial or correct for overdispersion in poisson dist
+model_para <- glmer(Tparasites ~ STi + Ai + Predation + Drainage + (1|Site/Drainage), data = data_analysis, family = binomial)
+plot(mean(data_analysis$Tparasites), var(data_analysis$Tparasites)) #variance > mean, overdispersed
+
 ```
 
 #### Linear models for population level
