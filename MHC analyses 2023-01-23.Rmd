@@ -326,4 +326,10 @@ g10 <- plot(coin_2)
 
 
 
-###
+### Remaking of figures from manuscript
+```{r ZombieFig1}
+#Zombie Figure 1
+
+
+```
+
