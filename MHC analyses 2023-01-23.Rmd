@@ -18,6 +18,7 @@ library(adegraphics)
 library(stringr)
 library(corrplot)
 library(lmerTest)
+library(factoextra)
 ```
 
 ### Data Prep
@@ -282,37 +283,73 @@ I've done these up for now but have not done model valiadation or interpretation
 Cannot do individual level microsatellite data, and population means are of more interest? We only have population estimates of Microstellite richness
 
 *make 3 models, orange, black, and parasite as responses (MHCSTr, MHCAr, MHCSTfreq, Pred as fixes, and random with site nested within drainage)*
+*Make 3 models*
+- 2 for colour (black and orange as response variables)
+- 1 for the impact of MHC on parasite abundance
+This means we need a PCA for the MHC variables, this should also address the correlation between STi and Ai (significant correlation)
+
+```{r MHC PCA}
+hist(data_analysis$STi)
+hist(data_analysis$Ai) # both have a slight left skew, all the ST freq will too as it's count data
+
+#gather the variables for the PCA (numerical MHC data)
+MHC_matrix<-data_analysis[,15:30] %>% 
+  mutate_all(~replace(., is.na(.), 0)) # replaces all NA values with 0s in frequency data
+
+mhc_pca<-prcomp(MHC_matrix) # when scaled the variance is much lower for the first few PCs
+summary(mhc_pca)
+#based on this the first one or maybe 2 PCs are worth including (PC1 54% and PC2 is 10% of variation)
+
+## Need to arcsin transform and join pca data to analysis data
+data_models<-data_analysis %>% 
+  mutate(Orange_arcsin = asin(sqrt(data_analysis$Orange)),
+         Black_arcsin = asin(sqrt(data_analysis$Black))) %>% # arcsin transform both Orange and Black
+  cbind(as.data.frame(mhc_pca[["x"]])) # add the PC variables from mhc_pca
+```
+
+*next steps and thoughts*
+try to fit models with the arcsin transformed data, still bounded between 0 and 1 but normal distribution
+Moving to lmer since normal distribution
+Need to do different model structures and generate model table like parrot fish paper
+
 ```{r individual level model orange, eval = FALSE}
-#how to add all the ST freq variables?????
-# GLM with binomial dist? data looks left skewed and is bounded between 0 and 1
-model_o <- glmer(Orange ~ Tparasites + STi + Ai + Predation + (1|Site/Drainage), data = data_analysis, family =  binomial) #singular
+#significant effect when Site is not a random effect, site is contributing most of the variation
+model_o <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models)
+summary(model_o)
 
-#tried allFit(), no optimizers work, additionally tried different random factor structure
-#STi and Ai are highly correlated so go forward with one in the model
-#How do we do ST frequency??? PCA?
+model_o2 <- lmer(Orange_arcsin ~ PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models)
+summary(model_o2)
 
-model_o1 <- glmer(Orange ~ STi + Predation + (1|Site), data = data_analysis, family =  binomial)
+model_o3 <- lmer(Orange_arcsin ~ Tparasites + PC1 + Predation + (1|Site/Drainage), data = data_models)
+summary(model_o3)
 
-model_o2 <- glmer(Orange ~ Tparasites + STi + Ai + Predation + (1|Site) + (1|Drainage), data = data_analysis, family =  binomial) #also singular
+model_o4 <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2+ (1|Site/Drainage), data = data_models)
+summary(model_o4)
 
-model_o3 <- glmer(Orange ~ Tparasites + STi + Ai + Predation + (1|Site), data = data_analysis, family =  binomial) #also singular
-
-model_o4 <- glm(Orange ~ Tparasites + STi + Ai + Predation, data = data_analysis, family =  binomial) 
-
-plot(model_o)
+ggplot(data = data_models, aes(x = PC1, y = Orange, colour = Predation)) + geom_point() + facet_wrap(~Drainage)
+ggplot(data = data_models, aes(x = Tparasites, y = Orange, colour = Predation)) + geom_point() + facet_wrap(~Drainage)
 ```
 
 
 ```{r individual model black, eval = FALSE}
-#Normally distributed?? Or binomial since it's bounded between 0 and 1?
-model_b <- glmer(Black ~ Tparasites + STi + Ai + Predation + Drainage + (1|Site/Drainage), data = data_analysis, family = binomial)
+model_b <- lmer(Black_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models)
+summary(model_b)
 ```
 
 
+parasite model is overdispersed and singular rn
 ```{r individual model parasites, eval = FALSE}
 #Poisson dist, if overdispersed use negative binomial or correct for overdispersion in poisson dist
-model_para <- glmer(Tparasites ~ STi + Ai + Predation + Drainage + (1|Site/Drainage), data = data_analysis, family = binomial)
+model_para <- glmer.nb(Tparasites ~ PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models) #singular fit
+
+model_para2 <- glmer(Tparasites ~ PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models, family = poisson(link = "log")) #singular fit
+
 plot(mean(data_analysis$Tparasites), var(data_analysis$Tparasites)) #variance > mean, overdispersed
+
+# but also take a look at the infection status rather than number of parasites?? 
+#This is less ecologically relevant and we may not include it
+
+model_infect <- glmer(InfectedBinary ~ PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models, family = binomial(link = "logit")) #singular
 
 ```
 
