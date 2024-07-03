@@ -277,15 +277,15 @@ model_mhcSTr_simple <- lmer(STi ~ Predation + Drainage + (1|Site), data = data_a
 model_mhcAr_simple <- lmer(Ai ~ Predation + Drainage + (1|Site), data = data_analysis)
 ```
 
-These give information on differences in traits of interest (colour, parasite, MHC) between key  variables (MHC, predation, and drainage).   
-I've done these up for now but have not done model valiadation or interpretation.
+These give information on differences in traits of interest (colour, parasite, MHC) between key variables (MHC, predation, and drainage).   
+I've done these up for now but have not done model validation or interpretation.
 
 Cannot do individual level microsatellite data, and population means are of more interest? We only have population estimates of Microstellite richness
 
 *make 3 models, orange, black, and parasite as responses (MHCSTr, MHCAr, MHCSTfreq, Pred as fixes, and random with site nested within drainage)*
 *Make 3 models*
 - 2 for colour (black and orange as response variables)
-- 1 for the impact of MHC on parasite abundance
+- 1 for the impact of MHC traits on parasite abundance
 This means we need a PCA for the MHC variables, this should also address the correlation between STi and Ai (significant correlation)
 
 ```{r MHC PCA}
@@ -314,16 +314,16 @@ Need to do different model structures and generate model table like parrot fish 
 
 ```{r individual level model orange, eval = FALSE}
 #significant effect when Site is not a random effect, site is contributing most of the variation
-model_o <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models)
+model_o <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
 summary(model_o)
 
-model_o2 <- lmer(Orange_arcsin ~ PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models)
+model_o2 <- lmer(Orange_arcsin ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
 summary(model_o2)
 
-model_o3 <- lmer(Orange_arcsin ~ Tparasites + PC1 + Predation + (1|Site/Drainage), data = data_models)
+model_o3 <- lmer(Orange_arcsin ~ Tparasites + PC1 + Predation + (1|Drainage/Site), data = data_models)
 summary(model_o3)
 
-model_o4 <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2+ (1|Site/Drainage), data = data_models)
+model_o4 <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2+ (1|Drainage/Site), data = data_models)
 summary(model_o4)
 
 ggplot(data = data_models, aes(x = PC1, y = Orange, colour = Predation)) + geom_point() + facet_wrap(~Drainage)
@@ -332,7 +332,7 @@ ggplot(data = data_models, aes(x = Tparasites, y = Orange, colour = Predation)) 
 
 
 ```{r individual model black, eval = FALSE}
-model_b <- lmer(Black_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models)
+model_b <- lmer(Black_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
 summary(model_b)
 ```
 
@@ -340,16 +340,20 @@ summary(model_b)
 parasite model is overdispersed and singular rn
 ```{r individual model parasites, eval = FALSE}
 #Poisson dist, if overdispersed use negative binomial or correct for overdispersion in poisson dist
-model_para <- glmer.nb(Tparasites ~ PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models) #singular fit
-
-model_para2 <- glmer(Tparasites ~ PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models, family = poisson(link = "log")) #singular fit
 
 plot(mean(data_analysis$Tparasites), var(data_analysis$Tparasites)) #variance > mean, overdispersed
+
+model_para <- glmer.nb(Tparasites ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models) #singular fit
+
+#suggestion present this but do drainage specific models in supplementary? in MS we can note that the random effects explain very little variation but this is the appropriate model structure for the ecology of the system
+
+model_para2 <- glmer(Tparasites ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models, family = poisson(link = "log")) #singular fit, pred and PC1 is significant
+model_para3 <- glmer(Tparasites ~ PC1 + PC2 + Predation + (1|Site), data = data_models, family = poisson(link = "log")) #not singular when I exclude Drainage, pred and PC1 is significant
 
 # but also take a look at the infection status rather than number of parasites?? 
 #This is less ecologically relevant and we may not include it
 
-model_infect <- glmer(InfectedBinary ~ PC1 + PC2 + Predation + (1|Site/Drainage), data = data_models, family = binomial(link = "logit")) #singular
+model_infect <- glmer(InfectedBinary ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models, family = binomial(link = "logit")) #singular
 
 ```
 
