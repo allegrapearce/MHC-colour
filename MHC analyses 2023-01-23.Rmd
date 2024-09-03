@@ -128,6 +128,7 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
   + check if microsatellite data has individual level in Jackie's thesis   
   + *maybe* re-do richness linear models with individual level data if available   
 * boxplot and other visualization/figure recreation with individual data   
+* Zombie Plot 1 - Turure is not with a symbol (need to also run analyses with and without Turure)
 
 
 #### Co-inertia analyses
@@ -331,7 +332,7 @@ g10 <- plot(coin_2)
 ### Remaking of figures from manuscript
 ```{r ZombieFig1}
 #Zombie Figure 1
-#what is the colour metric? relative area? Plotting on y axis, but not sure what label should be....
+#what is the colour metric: relative area
 #Orange ?
 boxplot(Orange ~ Predation, data = MHCDF)
 boxplot(Orange ~ drainage, data = MHCDF)
