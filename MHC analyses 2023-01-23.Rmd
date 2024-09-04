@@ -19,6 +19,8 @@ library(stringr)
 library(corrplot)
 library(lmerTest)
 library(factoextra)
+library(MuMIn)
+library(lme4)
 ```
 
 ### Data Prep
@@ -67,7 +69,7 @@ pop_means <- data_analysis %>%
 #adding to PopDF, removing populations with no colour data
 PopDF <- inner_join(PopDF, pop_means, by = 'Site')
 
-knitr::kable(pop_means, col.names = c("Site", "Mean Relative Orange", "Mean Relative Black"), "simple")
+#knitr::kable(pop_means, col.names = c("Site", "Mean Relative Orange", "Mean Relative Black"), "simple")
 ```
 
 
@@ -418,10 +420,9 @@ summary(glm2_final)
 ```
 
 *next steps and thoughts*
-try to fit models with the arcsin transformed data, still bounded between 0 and 1 but normal distribution
-  + is arsin data scaled??
-Moving to lmer since normal distribution
-Need to do different model structures and generate model table like parrot fish paper
+fit models with the arcsin transformed data, still bounded between 0 and 1 but normal distribution
+Need to do different model structures and generate model table like parrot fish paper (dredging)
+remove populations with no parasites (do I do this for all models or just the parasite one)
 
 ```{r individual level model orange, eval = FALSE}
 #significant effect when Site is not a random effect, site is contributing most of the variation
@@ -445,9 +446,90 @@ ggplot(data = data_models, aes(x = Tparasites, y = Orange, colour = Predation)) 
 ```
 
 
-```{r individual model black, eval = FALSE}
-model_b <- lmer(Black_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
-summary(model_b)
+Trying a dredge approach with each of the individual models to get consensus on most important variables
+Currently: 
++ Predation in every model 
++ varying all ST frequencies and richness variables
++ colour models have number of parasites as a predictor possibility
+
+To Do:
++ exclude populations with no parasites for the parasite model (double check if I've done this already)
++ correct the parasite model so it appropriately handles the count data
++ retain the parasite free populations for colour models and don't use parasites as a predictor
++ add code for both with and without the turure populations (since these are introductions)
++ model averaging?? (read parrot fish paper)
+
+```{r dredge black, eval = FALSE}
+
+#double checking there are no NAs, but we need to use na.fail because it prevents comparing mdoels with different datasets as the default drops observations with NA in any variable
+data_models %>% 
+  summarise(across(c(Black_arcsin, Tparasites_scaled, Ai, STi,  ST_freq_1:ST_freq_9, ST_freq_11:ST_freq_15, Predation), ~ sum(is.na(.), na.rm=FALSE)))
+
+fm.black<- lmer(Black_arcsin ~ Tparasites_scaled + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
+
+#with out correlated variables, I will not force it to include ecological variables for now to see what we get (example from dredge function demo for excluding correlated vars)
+# Suppose we want to have a set of models excluding combinations of collinear
+# variables that are significantly (p < 0.05) correlated, with Pearson
+# correlation coefficient r > 0.5
+
+# I did this but it only excludes a couple of combinations for the dredging and is not optimized to make sure Predation is always included.
+is.correlated <- function(i, j, data, conf.level = 0.95, cutoff = 0.5, ...) {
+ 	if(j >= i) return(NA)
+ 	ct <- cor.test(data[, i], data[, j], conf.level = conf.level, ...)
+ 	ct$p.value > (1 - conf.level) || abs(ct$estimate) <= cutoff
+ }
+
+# Need vectorized function to use with 'outer'
+vCorrelated <- Vectorize(is.correlated, c("i", "j"))
+
+# Create logical matrix
+smat <- outer(1:17, 1:17, vCorrelated, data = data_models[,c(15:30,49)])
+
+nm <- colnames(data_models[,c(15:30,49)])
+
+dimnames(smat) <- list(nm, nm) #only removes a couple combinations
+
+dredge_black<-dredge(fm.black, subset = smat) #very slow to run, cluster this?
+```
+
+
+```{r parallel dredge}
+if(MuMIn:::.parallelPkgCheck(quiet = TRUE)) {
+}
+if (FALSE) {require(parallel) || require(snow)} # usually this is run?
+
+#set up cluster for parallel processing
+no_cores <- detectCores() - 1
+clust <- makeCluster(no_cores)
+
+#load MuMIn package and model1 onto cluster
+clusterExport(clust, "data_models")
+clusterEvalQ(clust, library("MuMIn")) # 1.5 hours with no clustering, 10 minutes with
+
+#specify the full model for each response variable and dredge the combination models
+
+#parasites, actually this needs to be adjusted because parasites are not normally distributed
+fm.para<- lme4::lmer(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
+
+print(system.time(dredge_para<-dredge(fm.para, fixed = "Predation", rank=AIC, cluster = clust)))
+
+#black
+fm.black<- lme4::lmer(Black_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
+
+print(system.time(dredge_black<-dredge(fm.black, fixed = "Predation", rank=AIC, cluster = clust)))
+
+#orange
+fm.orange<- lme4::lmer(Orange_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
+
+print(system.time(dredge_orange<-dredge(fm.orange, fixed = "Predation", rank=AIC, cluster = clust)))
+
+# best models and null model
+models_sub_para <- subset(dredge_para, delta < 2)
+models_sub_black <- subset(dredge_black, delta < 2)
+models_sub_orange <- subset(dredge_orange, delta < 2)
+
+
+stopCluster(clust)
 ```
 
 
