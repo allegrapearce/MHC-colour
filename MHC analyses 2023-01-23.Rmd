@@ -127,6 +127,9 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
   + check if microsatellite data has individual level in Jackie's thesis   
   + *maybe* re-do richness linear models with individual level data if available   
 * boxplot and other visualization/figure recreation with individual data   
+* COIA per drainage?
+  + do we want to address this comment?
+
 
 
 #### Co-inertia analyses
@@ -171,6 +174,8 @@ mhc_r_matrix <- data_matrices %>%
     Data matrix (2) contained MHC-Ar, and MHC-STr
 
 Permutation test with 1000 bootstrap replications to test significance of co-variation in COIA
+
+If we were to address the drainage comment from first reviewers we would want to split these data frames where possible to be drainage specific, not sure if there's sufficient sites for that
 
 ```{r coia}
 # pcas, currently keeping all factors
@@ -270,11 +275,11 @@ Move to linear mixed models that control for both predation and drainage, these 
 
 ```{r individual level drainage and predation only, include=FALSE, eval=FALSE}
 #these are analagous to the wilcox, however we can do better, not currently used or run in this file
-model_o_simple <- lmer(Orange ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_o_simple <- lmer(Orange ~ Predation + Drainage + (1|Site), data = data_analysis) #north drainage sig
 model_b_simple <- lmer(Black ~ Predation + Drainage + (1|Site), data = data_analysis)
-model_para_simple <- lmer(Tparasites ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_para_simple <- lmer(Tparasites ~ Predation + Drainage + (1|Site), data = data_analysis) #low pred sig
 model_mhcSTr_simple <- lmer(STi ~ Predation + Drainage + (1|Site), data = data_analysis)
-model_mhcAr_simple <- lmer(Ai ~ Predation + Drainage + (1|Site), data = data_analysis)
+model_mhcAr_simple <- lmer(Ai ~ Predation + Drainage + (1|Site), data = data_analysis) #north drainage sig
 ```
 
 These give information on differences in traits of interest (colour, parasite, MHC) between key variables (MHC, predation, and drainage).   
@@ -288,6 +293,7 @@ Cannot do individual level microsatellite data, and population means are of more
 - 1 for the impact of MHC traits on parasite abundance
 This means we need a PCA for the MHC variables, this should also address the correlation between STi and Ai (significant correlation)
 
+
 ```{r MHC PCA}
 hist(data_analysis$STi)
 hist(data_analysis$Ai) # both have a slight left skew, all the ST freq will too as it's count data
@@ -296,19 +302,124 @@ hist(data_analysis$Ai) # both have a slight left skew, all the ST freq will too 
 MHC_matrix<-data_analysis[,15:30] %>% 
   mutate_all(~replace(., is.na(.), 0)) # replaces all NA values with 0s in frequency data
 
-mhc_pca<-prcomp(MHC_matrix) # when scaled the variance is much lower for the first few PCs
+mhc_pca<-prcomp(MHC_matrix, scale. = TRUE, center = TRUE)
 summary(mhc_pca)
-#based on this the first one or maybe 2 PCs are worth including (PC1 54% and PC2 is 10% of variation)
+#based on this the first one or maybe 2 PCs? PC3 and higher under 10% variance explained
 
 ## Need to arcsin transform and join pca data to analysis data
 data_models<-data_analysis %>% 
   mutate(Orange_arcsin = asin(sqrt(data_analysis$Orange)),
          Black_arcsin = asin(sqrt(data_analysis$Black))) %>% # arcsin transform both Orange and Black
-  cbind(as.data.frame(mhc_pca[["x"]])) # add the PC variables from mhc_pca
+  cbind(as.data.frame(mhc_pca[["x"]])) %>% # add the PC variables from mhc_pca
+  mutate(Tparasites_scaled = Tparasites,
+         Orange_scaled = Orange,
+         Black_scaled = Black) %>% #add variables for scaling and use as predictors
+  mutate(Site = as.factor(as.character(Site))) # reclassify this to remove the extra level from Arima2
+#change NA to 0 for frequency columns (to prevent model dropping??)
+data_models[c(17:30)][is.na(data_models[c(17:30)])] <- 0 #changing frequencies to 0 if ST is not present
+data_models[,c(10:11,15:30,49:51)]<-scale(data_models[,c(10:11,15:30,49:51)], center=T, scale=T) #scaling continuous predictors variables
+```
+
+Maybe try a lasso regression for variable selection?
+
+I tried this but either it's not working or I don't think I have enough variables for it to be worth it, I'll just stick with PCA?
+```{r LASSO}
+library(glmmLasso);library(MASS);library(nlme);library(lme4)
+
+
+###For parasites, currently not working
+## Using BIC (or AIC, respectively) to determine the optimal tuning parameter lambda
+
+lambda <- seq(500,0,by=-5)
+BIC_vec<-rep(Inf,length(lambda))
+family <- poisson(link = log)
+## first fit good starting model
+PMM<-glmmPQL(Tparasites~1,random = ~1|Site,family=family,data=data_models) #ideally ~1|Drainage/Site
+Delta.start<-c(as.numeric(PMM$coef$fixed),rep(0,17),as.numeric(t(PMM$coef$random$Site))) #for now just taking Site can't figure out nested RF
+Q.start<-as.numeric(VarCorr(PMM)[1,1])
+
+glmmLasso(Tparasites ~ Ai + STi + ST_freq_1 +
+                      ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
+                      ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
+                      ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation), 
+                      rnd = list(Drainage=~1, Site=~1),  ##can't figure out nested random effects yet
+                      family = family, data = data_models, lambda=lambda[.5],switch.NR=FALSE,final.re=FALSE,
+                      )
+
+for(j in 1:length(lambda)){
+print(paste("Iteration ", j,sep=""))
+  
+glm1 <- try(glmmLasso(Tparasites ~ Ai + STi + ST_freq_1 +
+                      ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
+                      ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
+                      ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation), 
+                      rnd = list(Site=~1),  ##can't figure out nested random effects yet
+                      family = family, data = data_models, lambda=lambda[j],switch.NR=FALSE,final.re=FALSE,
+                      ), silent = FALSE)  
+
+
+if(!inherits(glm1, "try-error"))
+{  
+BIC_vec[j]<-glm1$bic
+}
+}
+    
+opt<-which.min(BIC_vec)
+        
+glm1_final <- glmmLasso(Tparasites~ Ai + STi + ST_freq_1 +
+                        ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
+                        ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
+                        ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation), rnd = list(Site=~1),  
+        family = family, data = data_models, lambda=lambda[opt],switch.NR=FALSE,final.re=FALSE)
+         
+  
+        
+summary(glm1_final) #getting estimates of 0 for all variables, something is wrong?
+
+###for colour models
+BIC_vec<-rep(Inf,length(lambda))
+
+lambda <- seq(500,0,by=-5)
+
+family <- gaussian(link = "identity")
+## first fit good starting model
+PQL<-glmmPQL(Orange_arcsin~1,random = ~1|Site,family=family,data=data_models)
+Delta.start<-c(as.numeric(PQL$coef$fixed),rep(0,6),as.numeric(t(PQL$coef$random$Site)))
+Q.start<-as.numeric(VarCorr(PQL)[1,1])
+
+for(j in 1:length(lambda)){
+print(paste("Iteration ", j,sep=""))
+  
+glm2 <- try(glmmLasso(Orange_arcsin~ Ai + STi + ST_freq_1 +
+                        ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
+                        ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
+                        ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation), + Tparasites_scaled, rnd = list(Site=~1),  
+        family = family, data = soccer, lambda=lambda[j],switch.NR=FALSE,final.re=FALSE), silent=TRUE)  
+
+
+if(!inherits(glm2, "try-error"))
+{  
+BIC_vec[j]<-glm2$bic
+}
+        
+}
+    
+opt<-which.min(BIC_vec)
+        
+glm2_final <- glmmLasso(Orange_arcsin~ Ai + STi + ST_freq_1 +
+                        ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
+                        ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
+                        ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation) + Tparasites_scaled, rnd = list(Site=~1),  
+        family = family, data = data_models, lambda=lambda[opt],switch.NR=FALSE,final.re=FALSE)
+         
+  
+        
+summary(glm2_final)
 ```
 
 *next steps and thoughts*
 try to fit models with the arcsin transformed data, still bounded between 0 and 1 but normal distribution
+  + is arsin data scaled??
 Moving to lmer since normal distribution
 Need to do different model structures and generate model table like parrot fish paper
 
@@ -317,13 +428,16 @@ Need to do different model structures and generate model table like parrot fish 
 model_o <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
 summary(model_o)
 
+model_o <- lmer(Orange ~ Tparasites + PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
+summary(model_o)
+
 model_o2 <- lmer(Orange_arcsin ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
 summary(model_o2)
 
 model_o3 <- lmer(Orange_arcsin ~ Tparasites + PC1 + Predation + (1|Drainage/Site), data = data_models)
 summary(model_o3)
 
-model_o4 <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2+ (1|Drainage/Site), data = data_models)
+model_o4 <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2 + (1|Drainage/Site), data = data_models)
 summary(model_o4)
 
 ggplot(data = data_models, aes(x = PC1, y = Orange, colour = Predation)) + geom_point() + facet_wrap(~Drainage)
