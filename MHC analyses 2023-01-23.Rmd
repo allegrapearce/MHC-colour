@@ -449,7 +449,7 @@ ggplot(data = data_models, aes(x = Tparasites, y = Orange, colour = Predation)) 
 Trying a dredge approach with each of the individual models to get consensus on most important variables
 Currently: 
 + Predation in every model 
-+ varying all ST frequencies and richness variables
++ varying all ST frequency variables and richness variables
 + colour models have number of parasites as a predictor possibility
 
 To Do:
@@ -492,8 +492,117 @@ dimnames(smat) <- list(nm, nm) #only removes a couple combinations
 dredge_black<-dredge(fm.black, subset = smat) #very slow to run, cluster this?
 ```
 
+remove any populations that do not have any parasites to create an appropriate dataset for the parasite model
+keep these populations in the colour model.
+Using a delta of 6 based on Richards (2011). "Many published model selection studies use a cut-off of Δ ≤ 2, to include only those models with ‘substantial support’ from the data (Burnham and Anderson 2001, p114). However, simulations suggest that this rule is too stringent, and a cut-off threshold of Δ ≤ 6 is often necessary to be 95% sure that the truly most parsimonious model is retained within the confidence set (Richards 2005, 2008)."
 
-```{r parallel dredge}
++ confirm there's no variables with only 0s across all populations (may be causing complete separation)
+```{r parasite model data prep}
+#prep dataframe for this analysis, subset of data that includes only populations with parasites
+parasite_free_pops <- data_models %>% 
+  group_by(Site) %>% 
+  summarize(parasites = sum(Tparasites)) %>% 
+  filter(parasites == 0) %>% 
+  pull(Site)
+
+data_models_para_only<-data_analysis %>% 
+  filter(!Site %in% parasite_free_pops) %>% 
+  mutate(Orange_arcsin = asin(sqrt(Orange)),
+         Black_arcsin = asin(sqrt(Black))) %>% # arcsin transform both Orange and Black
+  mutate(Tparasites_scaled = Tparasites,
+         Orange_scaled = Orange,
+         Black_scaled = Black) %>% #add variables for scaling and use as predictors
+  mutate(Site = as.factor(as.character(Site))) # reclassify this to remove the extra level from Arima2
+
+#change NA to 0 for frequency columns (to prevent model dropping??)
+data_models_para_only[c(17:30)][is.na(data_models_para_only[c(17:30)])] <- 0 #changing frequencies to 0 if ST is not present
+data_models_para_only[,c(10:11,15:30,33:35)]<-scale(data_models_para_only[,c(10:11,15:30,33:35)], center=T, scale=T) #scaling continuous predictors
+
+#definitely zero-inflated count data
+hist(data_models_para_only$Tparasites)
+#checking data structure, overdispersion?
+plot(mean(data_models_para_only$Tparasites), var(data_models_para_only$Tparasites)) #if var > mean it's overdispersed (true)
+```
+
+
+```{r parasite model dredge}
+#run in parallel because it is a lot of variables
+if(MuMIn:::.parallelPkgCheck(quiet = TRUE)) {
+}
+if (FALSE) {require(parallel) || require(snow)} # usually this is run?
+
+#set up cluster for parallel processing
+no_cores <- detectCores() - 1
+clust <- makeCluster(no_cores)
+
+#load MuMIn package and model1 onto cluster
+clusterExport(clust, "data_models_para_only")
+clusterEvalQ(clust, library("lme4"))
+clusterEvalQ(clust, library("MuMIn"))
+
+
+#specify the full model for each response variable and dredge the combination models
+
+#both of these are singular fits, variance explained by random effects is 0 in either Drainage (fm.para2) or both Drainage and Drainage:Site (fm.para1)
+fm.para1<- glmer.nb(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|Drainage/Site), 
+                    na.action = "na.fail", 
+                    data = data_models_para_only, 
+                    control=glmerControl(optimizer="bobyqa"))
+
+fm.para2<- glmer(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), 
+                 na.action = "na.fail", 
+                 data = data_models_para_only, family = "poisson", 
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+#try drainage specific models to see if this fixes the singular fit by simplifying the random effect structure
+#Downdated VtV is not positive definite, complete separation?
+fm.para3<- glmer.nb(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site),
+                    na.action = "na.fail", 
+                    data = (data_models_para_only %>% filter(Drainage == "North Slope")),
+                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+#look for complete separation based on error, cannot do that since it doesn't create an object
+#complete separation
+library(detectseparation)
+update(fm.para1,method="detect_separation") #doesn't work?
+
+fm.para4<- glmer.nb(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site),
+                    na.action = "na.fail", 
+                    data = (data_models_para_only %>% filter(Drainage == "Caroni")),
+                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+
+fm.para5<- glmer(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site), 
+                 na.action = "na.fail", 
+                 data = (data_models_para_only %>% filter(Drainage == "North Slope")), 
+                 family = "poisson", 
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+
+fm.para6<- glmer(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site), 
+                 na.action = "na.fail", 
+                 data = (data_models_para_only %>% filter(Drainage == "Caroni")), 
+                 family = "poisson", 
+                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+
+print(system.time(dredge_para<-dredge(fm.para1, fixed = "Predation", rank="AICc", cluster = clust)))
+
+stopCluster(clust)
+
+# best and null models
+models_sub_para <- subset(dredge_para, delta < 2)
+```
+
+Then average models above a delta cut-off. Using 2 here, however some literature suggests 6 is an appropriate cut-off
+"With <5 levels, the mixed model may not be able to estimate the among-population variance accurately. In this case, the variance estimate will either collapse to zero, making the model equivalent to an ordinary GLM (Gelman & Hill, 2007, p. 275) or be non-zero but incorrect if the small number of groups that were sampled are not representative of true distribution of means (Harrison, 2015)."
++ this is a potential reason why it's singular, drainage only has 3 levels
+```{r model interpretation}
+summary(model.avg(dredge_para, subset = delta <= 2))
+```
+
+
+move to drainage specific models to see if this fixes the singular fit...It does not and we have complete separation in nb model
+```{r parallel dredge colour, eval = false}
 if(MuMIn:::.parallelPkgCheck(quiet = TRUE)) {
 }
 if (FALSE) {require(parallel) || require(snow)} # usually this is run?
@@ -508,61 +617,46 @@ clusterEvalQ(clust, library("MuMIn")) # 1.5 hours with no clustering, 10 minutes
 
 #specify the full model for each response variable and dredge the combination models
 
-#parasites, actually this needs to be adjusted because parasites are not normally distributed
-fm.para<- lme4::lmer(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
+#black across drainages is singular, trying drainage specific models to help simplify random effect structure. Caroni does not have enough sites (and one is turure)
+#fm.black<- lme4::lmer(Black_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models) #singular
 
-print(system.time(dredge_para<-dredge(fm.para, fixed = "Predation", rank=AIC, cluster = clust)))
+fm.black2<- lme4::lmer(Black_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site), 
+                       na.action = "na.fail", 
+                       data = data_models %>% filter(Drainage == "North Slope"))
 
-#black
-fm.black<- lme4::lmer(Black_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
+fm.black3<- lme4::lmer(Black_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site), 
+                       na.action = "na.fail", 
+                       data = data_models %>% filter(Drainage == "Caroni"))
 
-print(system.time(dredge_black<-dredge(fm.black, fixed = "Predation", rank=AIC, cluster = clust)))
+print(system.time(dredge_black_north<-dredge(fm.black2, fixed = "Predation", rank=AIC, cluster = clust))) # can't filter?
+print(system.time(dredge_black_caroni<-dredge(fm.black3, fixed = "Predation", rank=AIC, cluster = clust)))
 
 #orange
 fm.orange<- lme4::lmer(Orange_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
 
+#print(system.time(dredge_orange<-dredge(fm.orange, fixed = c("Predation", "Ai", "STi"), rank=AIC, cluster = clust)))
 print(system.time(dredge_orange<-dredge(fm.orange, fixed = "Predation", rank=AIC, cluster = clust)))
 
 # best models and null model
-models_sub_para <- subset(dredge_para, delta < 2)
-models_sub_black <- subset(dredge_black, delta < 2)
-models_sub_orange <- subset(dredge_orange, delta < 2)
+models_sub_black_north <- subset(dredge_black_north, delta < 6)
+models_sub_black_caroni <- subset(dredge_black_caroni, delta < 6)
 
+models_sub_orange <- subset(dredge_orange, delta < 6)
 
 stopCluster(clust)
 ```
 
 
-parasite model is overdispersed and singular rn
-```{r individual model parasites, eval = FALSE}
-#Poisson dist, if overdispersed use negative binomial or correct for overdispersion in poisson dist
-
-plot(mean(data_analysis$Tparasites), var(data_analysis$Tparasites)) #variance > mean, overdispersed
-
-model_para <- glmer.nb(Tparasites ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models) #singular fit
-
-#suggestion present this but do drainage specific models in supplementary? in MS we can note that the random effects explain very little variation but this is the appropriate model structure for the ecology of the system
-
-model_para2 <- glmer(Tparasites ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models, family = poisson(link = "log")) #singular fit, pred and PC1 is significant
-model_para3 <- glmer(Tparasites ~ PC1 + PC2 + Predation + (1|Site), data = data_models, family = poisson(link = "log")) #not singular when I exclude Drainage, pred and PC1 is significant
-
-# but also take a look at the infection status rather than number of parasites?? 
-#This is less ecologically relevant and we may not include it
-
-model_infect <- glmer(InfectedBinary ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models, family = binomial(link = "logit")) #singular
-
-```
 
 #### Linear models for population level
 
 Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level.
-These could potentially be made individual level if we have individual microsatellite data if we want to.   
 
 Results:
 MHC-Ar, significant like original work
 MHC-STr, insignificant like original work
 
-```{r linear models}
+```{r microsat models old, eval = false}
 # p=0.0006 matches (paper = 0.001), it's significant
 model_ar <- lm(`Micro-Ar` ~ `MHC-Ar`, data = PopDF)
 summary(model_ar)
@@ -570,6 +664,24 @@ summary(model_ar)
 #p=0.12 not an exact match (paper = 0.289), not significant
 model_str <- lm(`Micro-Ar` ~ `MHC-STr`, data = PopDF)
 summary(model_str)
+```
+
+moving to a more appropriate mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site). 
+
++ does this have implications for the random factor of drainage? As the drainages are represented unevenly
+```{r microsat mixed models}
+
+model_ar <- lmer(`Micro-Ar` ~ `MHC-Ar` + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+summary(model_ar)
+
+model_str <- lmer(`Micro-Ar` ~ `MHC-STr` + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+summary(model_str)
+
+model_micro <- lm(`Micro-Ar` ~ `MHC-STr` + `MHC-Ar` + Predation + Drainage, data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+summary(model_micro)
+
+model_micro2 <- lmer(`Micro-Ar` ~ `MHC-STr` + `MHC-Ar` + Predation + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+summary(model_micro2)
 ```
 
 
