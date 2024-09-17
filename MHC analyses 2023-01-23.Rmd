@@ -494,9 +494,7 @@ dredge_black<-dredge(fm.black, subset = smat) #very slow to run, cluster this?
 
 remove any populations that do not have any parasites to create an appropriate dataset for the parasite model
 keep these populations in the colour model.
-Using a delta of 6 based on Richards (2011). "Many published model selection studies use a cut-off of Δ ≤ 2, to include only those models with ‘substantial support’ from the data (Burnham and Anderson 2001, p114). However, simulations suggest that this rule is too stringent, and a cut-off threshold of Δ ≤ 6 is often necessary to be 95% sure that the truly most parsimonious model is retained within the confidence set (Richards 2005, 2008)."
 
-+ confirm there's no variables with only 0s across all populations (may be causing complete separation)
 ```{r parasite model data prep}
 #prep dataframe for this analysis, subset of data that includes only populations with parasites
 parasite_free_pops <- data_models %>% 
@@ -524,9 +522,59 @@ hist(data_models_para_only$Tparasites)
 plot(mean(data_models_para_only$Tparasites), var(data_models_para_only$Tparasites)) #if var > mean it's overdispersed (true)
 ```
 
+```{r checking levels}
+data_analysis %>% 
+  filter(!Site %in% parasite_free_pops) %>% 
+  filter(Drainage == "Caroni") %>% 
+  group_by(Site) %>% 
+  summarize_at(vars(ST_freq_1:ST_freq_15), sum, na.rm = T) # no instances of ST 14 and 3 should be removed
 
+data_analysis %>% 
+  filter(!Site %in% parasite_free_pops) %>% 
+  filter(Drainage == "North Slope") %>% 
+  group_by(Site) %>% 
+  summarize_at(vars(ST_freq_1:ST_freq_15), sum, na.rm = T) # no instances of ST 12 and 4 should be removed from drainage dredge model
+
+#something is not right with ST 8 in the North Slope model
+ggplot(data_analysis %>% filter(Drainage == "North Slope"), aes(ST_freq_8, Tparasites, colour = Site)) + geom_jitter() #no fish with ST 8 have parasites
+
+parasites_w_ST <- function(parasite_col, ST_col) {
+  sum(parasite_col[!is.na(ST_col)])
+}
+
+## Looking into the Std error issue with ST 8 in the North Slope
+#looks like no fish that have this ST have any parasites so the model is confused?
+data_analysis %>% 
+  filter(Drainage == "North Slope") %>% 
+  filter(!is.na(ST_freq_8))
+
+#checking if this occurs elsewhere in the dataset, but we good
+data_analysis %>% 
+  group_by(Drainage) %>% 
+  summarize(sum_para_ST1 = parasites_w_ST(Tparasites, ST_freq_1),
+            sum_para_ST2 = parasites_w_ST(Tparasites, ST_freq_2),
+            sum_para_ST3 = parasites_w_ST(Tparasites, ST_freq_3),
+            sum_para_ST4 = parasites_w_ST(Tparasites, ST_freq_4),
+            sum_para_ST5 = parasites_w_ST(Tparasites, ST_freq_5),
+            sum_para_ST6 = parasites_w_ST(Tparasites, ST_freq_6),
+            sum_para_ST7 = parasites_w_ST(Tparasites, ST_freq_7),
+            sum_para_ST8 = parasites_w_ST(Tparasites, ST_freq_8),
+            sum_para_ST9 = parasites_w_ST(Tparasites, ST_freq_9),
+            sum_para_ST11 = parasites_w_ST(Tparasites, ST_freq_11),
+            sum_para_ST12 = parasites_w_ST(Tparasites, ST_freq_12),
+            sum_para_ST13 = parasites_w_ST(Tparasites, ST_freq_13),
+            sum_para_ST14 = parasites_w_ST(Tparasites, ST_freq_14),
+            sum_para_ST15 = parasites_w_ST(Tparasites, ST_freq_15))
+
+```
+
+
+FIX alternative oropouche spellings (PopDF has oropuche)
 ```{r parasite model dredge}
-#run in parallel because it is a lot of variables
+
+data_models_para_only_caroni <- data_models_para_only %>% filter(Drainage == "Caroni")
+data_models_para_only_north <- data_models_para_only %>% filter(Drainage == "North Slope")
+
 if(MuMIn:::.parallelPkgCheck(quiet = TRUE)) {
 }
 if (FALSE) {require(parallel) || require(snow)} # usually this is run?
@@ -536,68 +584,108 @@ no_cores <- detectCores() - 1
 clust <- makeCluster(no_cores)
 
 #load MuMIn package and model1 onto cluster
-clusterExport(clust, "data_models_para_only")
+clusterExport(clust, "data_models_para_only_caroni")
+clusterExport(clust, "data_models_para_only_north")
 clusterEvalQ(clust, library("lme4"))
 clusterEvalQ(clust, library("MuMIn"))
 
 
-#specify the full model for each response variable and dredge the combination models
+#specify the full model for each response variable and dredge the combination models, moved to drainage specific models as global model was singular and had no variance explained by Drainage random factor. Models still singular, less than 5 levels for river
 
-#both of these are singular fits, variance explained by random effects is 0 in either Drainage (fm.para2) or both Drainage and Drainage:Site (fm.para1)
-fm.para1<- glmer.nb(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|Drainage/Site), 
-                    na.action = "na.fail", 
-                    data = data_models_para_only, 
-                    control=glmerControl(optimizer="bobyqa"))
+#no complete separation but still singular
+#fm_para_car_nb<- glmer.nb(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_15  + (1|River/Site), na.action = "na.fail", data = data_models_para_only_caroni, control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=1e5)), verbose = T)
 
-fm.para2<- glmer(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), 
-                 na.action = "na.fail", 
-                 data = data_models_para_only, family = "poisson", 
-                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+#still complete separation....
+#fm_para_nor_nb<- glmer.nb(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|River/Site), na.action = "na.fail", data = data_models_para_only_north, control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=1e5)), verbose = T)
 
-#try drainage specific models to see if this fixes the singular fit by simplifying the random effect structure
-#Downdated VtV is not positive definite, complete separation?
-fm.para3<- glmer.nb(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site),
-                    na.action = "na.fail", 
-                    data = (data_models_para_only %>% filter(Drainage == "North Slope")),
-                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+#both are singular fits
+fm_para_car_mm<- glmer(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_15  + (1|River/Site), na.action = "na.fail", data = data_models_para_only_caroni, family = "poisson")
 
-#look for complete separation based on error, cannot do that since it doesn't create an object
-#complete separation
-library(detectseparation)
-update(fm.para1,method="detect_separation") #doesn't work?
+#with ST_8: there is no explanatory power for this predictor because all fish with ST_8 have 0 parasites in this drainage and there's a small sample size (N=4), removing for now
+#fm_para_nor_mm<- glmer(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|River/Site), na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
 
-fm.para4<- glmer.nb(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site),
-                    na.action = "na.fail", 
-                    data = (data_models_para_only %>% filter(Drainage == "Caroni")),
-                    control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+fm_para_nor_mm<- glmer(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_9+ ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|River/Site), na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
+
+fm_para_nor_mm_ST8<- glmer(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|River/Site), na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
+
+print(system.time(dredge_para_car_mm<-dredge(fm_para_car_mm, fixed = c("Predation"), rank="AICc", extra = "R^2", cluster = clust)))
+
+print(system.time(dredge_para_nor_mm<-dredge(fm_para_nor_mm, fixed = c("Predation"), rank="AICc", extra = "R^2", cluster = clust)))
+
+print(system.time(dredge_para_nor_mm_ST8<-dredge(fm_para_nor_mm_ST8, fixed = c("Predation"), rank="AICc", extra = "R^2", cluster = clust)))
 
 
-fm.para5<- glmer(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site), 
-                 na.action = "na.fail", 
-                 data = (data_models_para_only %>% filter(Drainage == "North Slope")), 
-                 family = "poisson", 
-                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# I am excluding this drainage specific model due to insufficient sample size
+#only one predation regime, 2 rivers with 1 site each (no convergence)
+#fm_para_oro<- glm(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Site, na.action = "na.fail", data = (data_models_para_only %>% filter(Drainage == "Oropouche")),family = "poisson")
 
 
-fm.para6<- glmer(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site), 
-                 na.action = "na.fail", 
-                 data = (data_models_para_only %>% filter(Drainage == "Caroni")), 
-                 family = "poisson", 
-                 control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+# as fixed effects due to singularity issues, gets NA estimates for site
 
-print(system.time(dredge_para<-dredge(fm.para1, fixed = "Predation", rank="AICc", cluster = clust)))
+#the caroni only model is not estimating ST 15 for some reason, ST 15 is present in most of the populations?
+fm_para_car<- glm(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_15 + River + Site, na.action = "na.fail", data = data_models_para_only_caroni, family = "poisson")
+
+print(system.time(dredge_para_car<-dredge(fm_para_car, fixed = c("Predation", "River", "Site"), rank="AICc", extra = "R^2", cluster = clust)))
+
+#with ST_8: there is no explanatory power for this predictor because all fish with ST_8 have 0 parasites in this drainage and there's a small sample size (N=4), removing for now
+#fm_para_nor<- glm(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + River, na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
+
+fm_para_nor<- glm(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_9 + ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + River, na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
+
+print(system.time(dredge_para_nor<-dredge(fm_para_nor, fixed = c("Predation", "River", "Site"), rank="AICc", extra = "R^2", cluster = clust)))
+
+fm_para_nor_ST8<- glm(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + River, na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
+
+print(system.time(dredge_para_nor_ST8<-dredge(fm_para_nor_ST8, fixed = c("Predation", "River", "Site"), rank="AICc", extra = "R^2", cluster = clust)))
+
 
 stopCluster(clust)
 
-# best and null models
-models_sub_para <- subset(dredge_para, delta < 2)
+
+#saving these because it takes a long time to dredge these models
+#save.image(file='output/DredgeModelsEnvironment.RData')
 ```
 
+
 Then average models above a delta cut-off. Using 2 here, however some literature suggests 6 is an appropriate cut-off
+Using a delta of 6 based on Richards (2011). "Many published model selection studies use a cut-off of Δ ≤ 2, to include only those models with ‘substantial support’ from the data (Burnham and Anderson 2001, p114). However, simulations suggest that this rule is too stringent, and a cut-off threshold of Δ ≤ 6 is often necessary to be 95% sure that the truly most parsimonious model is retained within the confidence set (Richards 2005, 2008)."
+
 "With <5 levels, the mixed model may not be able to estimate the among-population variance accurately. In this case, the variance estimate will either collapse to zero, making the model equivalent to an ordinary GLM (Gelman & Hill, 2007, p. 275) or be non-zero but incorrect if the small number of groups that were sampled are not representative of true distribution of means (Harrison, 2015)."
-+ this is a potential reason why it's singular, drainage only has 3 levels
+-> this is a potential reason why it's singular, drainage only has 3 levels
+
++ predation always as fixed due to 2 levels, drainage has 3 levels and sometimes this is insufficient to account for variation
++ dredge these multiple models separately and interpret each drainage, using different evolutionary histories to explain why this is needed
++ model average the dredge models
++ can't really do model averaged effect size (pkg - AICcmodavg) except for categorical comparisons (so basically only Predation which isn't of interest here)
 ```{r model interpretation}
-summary(model.avg(dredge_para, subset = delta <= 2))
+# best and null models
+models_sub_para_car <- get.models(dredge_para_car, subset = delta <= 2)
+models_sub_para_nor <- subset(dredge_para_nor, delta < 2)
+
+models_sub_para_car_mm <- get.models(dredge_para_car_mm, subset = delta <= 2)
+models_sub_para_nor_mm <- subset(dredge_para_nor_mm, delta < 2)
+
+#output
+summary(model.avg(dredge_para_car, subset = delta <= 2))
+summary(model.avg(dredge_para_nor, subset = delta <= 2))
+summary(model.avg(dredge_para_nor_ST8, subset = delta <= 2))
+
+summary(model.avg(dredge_para_car_mm, subset = delta <= 2))
+summary(model.avg(dredge_para_nor_mm, subset = delta <= 2))
+summary(model.avg(dredge_para_nor_mm_ST8, subset = delta <= 2))
+
+plot(model.avg(dredge_para_car, subset = delta <= 2))
+plot(model.avg(dredge_para_nor, subset = delta <= 2))
+plot(model.avg(dredge_para_nor_ST8, subset = delta <= 2))
+
+plot(model.avg(dredge_para_car_mm, subset = delta <= 2))
+plot(model.avg(dredge_para_nor_mm, subset = delta <= 2))
+plot(model.avg(dredge_para_nor_mm_ST8, subset = delta <= 2))
+
+
+#one parameter at a time with this package but gives confint, create a loop and go through the variables (AICcModAvg package)
+#modavg(models_sub_para_car_mm, parm = "ST_freq_9", second.ord = TRUE, uncond.se = "revised", conf.level = 0.95)
+
 ```
 
 
@@ -668,21 +756,33 @@ summary(model_str)
 
 moving to a more appropriate mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site). 
 
-+ does this have implications for the random factor of drainage? As the drainages are represented unevenly
-```{r microsat mixed models}
+river column edit NOTE move this up to data cleaning section
+```{r microsat mixed model}
+PopDF <- PopDF %>% #create river column 
+  mutate(River = as.factor(gsub('[0-9]+', '', Site))) %>% 
+  mutate(Drainage_simple = gsub(' \\(Caroni type\\)', '', Drainage)) #creates a simplified column for drainage that includes turure
 
-model_ar <- lmer(`Micro-Ar` ~ `MHC-Ar` + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
-summary(model_ar)
-
-model_str <- lmer(`Micro-Ar` ~ `MHC-STr` + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
-summary(model_str)
-
-model_micro <- lm(`Micro-Ar` ~ `MHC-STr` + `MHC-Ar` + Predation + Drainage, data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+#Predation regime may contribute variance but only has two levels and will be added as a fixed factor
+model_micro <- lmer(`Micro-Ar` ~ `MHC-STr` + `MHC-Ar` + Predation + (1|Drainage/River), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
 summary(model_micro)
 
-model_micro2 <- lmer(`Micro-Ar` ~ `MHC-STr` + `MHC-Ar` + Predation + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
-summary(model_micro2)
+#run with and without turure (since it's an introduction), conclusions are the same
+model_micro_all <- lmer(`Micro-Ar` ~ `MHC-STr` + `MHC-Ar` + Predation + (1|Drainage_simple/River), data = PopDF)
+summary(model_micro_all)
+
+#effect size
+library("r2glmm")
+
+model_micro_all_r2 <- r2beta(model_micro_all) #marginal r2
+plot(model_micro_all_r2)
+
+#plots of these factors
+ggplot(PopDF, aes(`MHC-Ar`, `Micro-Ar`, colour = Drainage_simple)) + geom_point(aes(shape = Predation)) + geom_smooth(method=lm , se=FALSE)
 ```
+
+
+Could try population level model for parasite dredging due to singularity issues
+QW suggested bayesian before pop level
 
 
 ### Figures
