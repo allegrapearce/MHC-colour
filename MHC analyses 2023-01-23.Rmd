@@ -355,11 +355,20 @@ plot(x = tempDF$`Gyrodactylus prevalence`, y = tempDF$mean_o
      , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17))) #double check pch symbols are correct! Once correct, add to rest of plots (if using)
 abline(lm(mean_o ~ `Gyrodactylus prevalence`, data = tempDF))
 #Jackie had yellow, but no idea why, and we didn't collect yellow data, anyways
+legend(x = "topright", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
+       # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
+       , bty = "n", pt.cex = 1.3, cex = 1.05
+       )
 
 plot(x = tempDF$`Gyrodactylus prevalence`, y = tempDF$mean_b
      , xlab = "Gyrodactylus prevelance", ylab = "Mean Black"
-     , las = 1)
+     , las = 1
+     , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17)))
 abline(lm(mean_b ~ `Gyrodactylus prevalence`, data = tempDF)) 
+legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
+       # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
+       , bty = "n", pt.cex = 1.3, cex = 1.05
+       )
 
 ```
 
