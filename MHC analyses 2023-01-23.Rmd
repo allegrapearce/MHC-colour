@@ -21,6 +21,9 @@ library(lmerTest)
 library(factoextra)
 library(MuMIn)
 library(lme4)
+library(performance)
+library(ggplot2)
+library(ggiraphExtra)
 ```
 
 ### Data Prep
@@ -69,6 +72,10 @@ pop_means <- data_analysis %>%
 #adding to PopDF, removing populations with no colour data
 PopDF <- inner_join(PopDF, pop_means, by = 'Site')
 
+PopDF <- PopDF %>% #create river column 
+  mutate(River = as.factor(gsub('[0-9]+', '', Site))) %>% 
+  mutate(Drainage_simple = gsub(' \\(Caroni type\\)', '', Drainage)) #creates a simplified column for drainage that includes turure
+
 #knitr::kable(pop_means, col.names = c("Site", "Mean Relative Orange", "Mean Relative Black"), "simple")
 ```
 
@@ -103,9 +110,9 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
   + We did this, it allowed us to move to individual level analysis   
 
 * Changing to Individual level analyses to leverage the new data   
-  + COIA (DONE)   
+  + COIA (DONE, but is this best?)   *look into COIA interpretation more*
   + Wilcoxon - change to models with individual data (DONE)   
-  + Microsatellite - dependent on whether we have individual microsat data   
+  + Microsatellite - keep at pop level 
 
 ### Analysis To Do: 
 
@@ -137,6 +144,8 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 #### Co-inertia analyses
 
 For coinertia analysis the row weighting must be matched between the two dudi (duality diagrams), so for each pca the rows must indicate the same samples. Using only fish we have both genetic data and patternize colour data for we have N = 193.
+
+currently has turure 2 which was originally a caroni introduction (turure 3 was too but has no parsites)
 ```{r data prep}
 # check for uninfected populations to exclude from analyses between immunity and colour
 no_parasite_sites <- data_analysis %>% 
@@ -211,529 +220,83 @@ corrplot(correlations , method = 'number')
 
 #using 0.20 as a cutoff, St freq 8,11,3,1 vs orange
 # none are significant, I am not sure if this is replicating what Jackie did
-PCC_1 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_1, method = "pearson")
-PCC_3 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_3, method = "pearson")
-PCC_8 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_8, method = "pearson")
-PCC_11 <- cor.test(data_analysis$Orange, data_analysis$ST_freq_11, method = "pearson")
+cor.test(data_analysis$Orange, data_analysis$ST_freq_1, method = "pearson")
+cor.test(data_analysis$Orange, data_analysis$ST_freq_3, method = "pearson")
+cor.test(data_analysis$Orange, data_analysis$ST_freq_8, method = "pearson")
+cor.test(data_analysis$Orange, data_analysis$ST_freq_11, method = "pearson")
 ```
 
 
-#### Wilcoxon Rank tests
+#### individual level mixed models
 
-By Predation and drainage (MHC-Ar, MHC-STr, Micro-Ar, MHC-ST frequencies; colour area, and Gyrodactylus prevalence).
+Move to linear mixed models that control for both predation and drainage, these are replacements for the wilcoxon but with some more thought into model structure and questions
 
-These Wilcox tests are unpaired because we aren't directly comparing the high/low pred sites and include all populations from 2010 with both colour and MHC data at population level (N = 19, populations without parasites included).
+Edit axes so they go to the maximum predicted values by increments of 1 (12, that's the highest parasite load)
+```{r individual level, include=FALSE, eval=FALSE}
+data_analysis_parasites <- data_analysis %>% 
+  filter(!Site %in% no_parasite_sites) %>% 
+  filter(Site != "ElCedro1") %>%  #removed in original study, parasite prev an order of magnitude below others
+  mutate(Site = as.factor(as.character(Site))) 
 
-```{r wilcox pop, warning=FALSE, results = 'hide'}
-#specific checks to see if the data matches the paper
-#wil_m_ar <- wilcox.test(high_pred_pop$`Micro-Ar`, low_pred_pop$`Micro-Ar`, paired = FALSE, alternative = "two.sided") # p = 0.010 (like in paper yay!)
+model_o <- lmer(Orange ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #north drainage and low pred almost sig
+model_b <- lmer(Black ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #oropouche drainage sig
 
-#wil_para_prev <- wilcox.test(high_pred_pop$`Gyrodactylus prevalence`, low_pred_pop$`Gyrodactylus prevalence`, paired = FALSE, alternative = "two.sided") # p = 0.001 (matches paper)
+check_model(model_o)
+check_model(model_b)
 
-wilcoxPred <- function(df, col) {
-  stopifnot(typeof(col) == "character")
-  wilcox.test(df[df$Predation == "High", col], df[df$Predation == "Low",col], paired = FALSE, alternative = "two.sided")
-}
-
-test_result <- wilcoxPred(PopDF, "mean_o")
-
-wilcox_output = list()
-for (column in colnames(PopDF[,6:23])) {
-  test_results <- wilcoxPred(PopDF, column)
-  test_results["data.name"] <- column
-  print(test_results)
-  wilcox_output[[length(wilcox_output)+1]] <- test_results
-  #names(wilcox_output)[column] <- names(column)
-}
-
-names(wilcox_output) <- colnames(PopDF[,6:23])
-#some have ties, wilcox.test cannot compute exact p-value with ties, try wilcox_test from coin package?
-
-# by drainage
-wilcoxDrain <- function(df, col) {
-  stopifnot(typeof(col) == "character")
-  wilcox.test(df[df$Drainage == "North Slope", col], df[df$Drainage == "Caroni",col], paired = FALSE, alternative = "two.sided")
-}
-
-test_result <- wilcoxDrain(PopDF, "mean_o")
-
-wilcox_output_d = list()
-for (column in colnames(PopDF[,6:23])) {
-  test_results <- wilcoxDrain(PopDF, column)
-  test_results["data.name"] <- column
-  print(test_results)
-  wilcox_output_d[[length(wilcox_output_d)+1]] <- test_results
-  #names(wilcox_output)[column] <- names(column)
-}
-
-names(wilcox_output_d) <- colnames(PopDF[,6:23])
-```
-
-
-#### Individual level mixed models
-
-Move to linear mixed models that control for both predation and drainage, these are just updated versions of the wilcoxon. However, we can do something nicer with a mixed model (second chunk).      
-(Not in MS currently)   
-
-```{r individual level drainage and predation only, include=FALSE, eval=FALSE}
-#these are analagous to the wilcox, however we can do better, not currently used or run in this file
-model_o_simple <- lmer(Orange ~ Predation + Drainage + (1|Site), data = data_analysis) #north drainage sig
-model_b_simple <- lmer(Black ~ Predation + Drainage + (1|Site), data = data_analysis)
-model_para_simple <- lmer(Tparasites ~ Predation + Drainage + (1|Site), data = data_analysis) #low pred sig
-model_mhcSTr_simple <- lmer(STi ~ Predation + Drainage + (1|Site), data = data_analysis)
-model_mhcAr_simple <- lmer(Ai ~ Predation + Drainage + (1|Site), data = data_analysis) #north drainage sig
-```
-
-These give information on differences in traits of interest (colour, parasite, MHC) between key variables (MHC, predation, and drainage).   
-I've done these up for now but have not done model validation or interpretation.
-
-Cannot do individual level microsatellite data, and population means are of more interest? We only have population estimates of Microstellite richness
-
-*make 3 models, orange, black, and parasite as responses (MHCSTr, MHCAr, MHCSTfreq, Pred as fixes, and random with site nested within drainage)*
-*Make 3 models*
-- 2 for colour (black and orange as response variables)
-- 1 for the impact of MHC traits on parasite abundance
-This means we need a PCA for the MHC variables, this should also address the correlation between STi and Ai (significant correlation)
-
-
-```{r MHC PCA}
-hist(data_analysis$STi)
-hist(data_analysis$Ai) # both have a slight left skew, all the ST freq will too as it's count data
-
-#gather the variables for the PCA (numerical MHC data)
-MHC_matrix<-data_analysis[,15:30] %>% 
-  mutate_all(~replace(., is.na(.), 0)) # replaces all NA values with 0s in frequency data
-
-mhc_pca<-prcomp(MHC_matrix, scale. = TRUE, center = TRUE)
-summary(mhc_pca)
-#based on this the first one or maybe 2 PCs? PC3 and higher under 10% variance explained
-
-## Need to arcsin transform and join pca data to analysis data
-data_models<-data_analysis %>% 
-  mutate(Orange_arcsin = asin(sqrt(data_analysis$Orange)),
-         Black_arcsin = asin(sqrt(data_analysis$Black))) %>% # arcsin transform both Orange and Black
-  cbind(as.data.frame(mhc_pca[["x"]])) %>% # add the PC variables from mhc_pca
-  mutate(Tparasites_scaled = Tparasites,
-         Orange_scaled = Orange,
-         Black_scaled = Black) %>% #add variables for scaling and use as predictors
-  mutate(Site = as.factor(as.character(Site))) # reclassify this to remove the extra level from Arima2
-#change NA to 0 for frequency columns (to prevent model dropping??)
-data_models[c(17:30)][is.na(data_models[c(17:30)])] <- 0 #changing frequencies to 0 if ST is not present
-data_models[,c(10:11,15:30,49:51)]<-scale(data_models[,c(10:11,15:30,49:51)], center=T, scale=T) #scaling continuous predictors variables
-```
-
-Maybe try a lasso regression for variable selection?
-
-I tried this but either it's not working or I don't think I have enough variables for it to be worth it, I'll just stick with PCA?
-```{r LASSO}
-library(glmmLasso);library(MASS);library(nlme);library(lme4)
-
-
-###For parasites, currently not working
-## Using BIC (or AIC, respectively) to determine the optimal tuning parameter lambda
-
-lambda <- seq(500,0,by=-5)
-BIC_vec<-rep(Inf,length(lambda))
-family <- poisson(link = log)
-## first fit good starting model
-PMM<-glmmPQL(Tparasites~1,random = ~1|Site,family=family,data=data_models) #ideally ~1|Drainage/Site
-Delta.start<-c(as.numeric(PMM$coef$fixed),rep(0,17),as.numeric(t(PMM$coef$random$Site))) #for now just taking Site can't figure out nested RF
-Q.start<-as.numeric(VarCorr(PMM)[1,1])
-
-glmmLasso(Tparasites ~ Ai + STi + ST_freq_1 +
-                      ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
-                      ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
-                      ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation), 
-                      rnd = list(Drainage=~1, Site=~1),  ##can't figure out nested random effects yet
-                      family = family, data = data_models, lambda=lambda[.5],switch.NR=FALSE,final.re=FALSE,
-                      )
-
-for(j in 1:length(lambda)){
-print(paste("Iteration ", j,sep=""))
-  
-glm1 <- try(glmmLasso(Tparasites ~ Ai + STi + ST_freq_1 +
-                      ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
-                      ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
-                      ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation), 
-                      rnd = list(Site=~1),  ##can't figure out nested random effects yet
-                      family = family, data = data_models, lambda=lambda[j],switch.NR=FALSE,final.re=FALSE,
-                      ), silent = FALSE)  
-
-
-if(!inherits(glm1, "try-error"))
-{  
-BIC_vec[j]<-glm1$bic
-}
-}
-    
-opt<-which.min(BIC_vec)
-        
-glm1_final <- glmmLasso(Tparasites~ Ai + STi + ST_freq_1 +
-                        ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
-                        ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
-                        ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation), rnd = list(Site=~1),  
-        family = family, data = data_models, lambda=lambda[opt],switch.NR=FALSE,final.re=FALSE)
-         
-  
-        
-summary(glm1_final) #getting estimates of 0 for all variables, something is wrong?
-
-###for colour models
-BIC_vec<-rep(Inf,length(lambda))
-
-lambda <- seq(500,0,by=-5)
-
-family <- gaussian(link = "identity")
-## first fit good starting model
-PQL<-glmmPQL(Orange_arcsin~1,random = ~1|Site,family=family,data=data_models)
-Delta.start<-c(as.numeric(PQL$coef$fixed),rep(0,6),as.numeric(t(PQL$coef$random$Site)))
-Q.start<-as.numeric(VarCorr(PQL)[1,1])
-
-for(j in 1:length(lambda)){
-print(paste("Iteration ", j,sep=""))
-  
-glm2 <- try(glmmLasso(Orange_arcsin~ Ai + STi + ST_freq_1 +
-                        ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
-                        ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
-                        ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation), + Tparasites_scaled, rnd = list(Site=~1),  
-        family = family, data = soccer, lambda=lambda[j],switch.NR=FALSE,final.re=FALSE), silent=TRUE)  
-
-
-if(!inherits(glm2, "try-error"))
-{  
-BIC_vec[j]<-glm2$bic
-}
-        
-}
-    
-opt<-which.min(BIC_vec)
-        
-glm2_final <- glmmLasso(Orange_arcsin~ Ai + STi + ST_freq_1 +
-                        ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 +
-                        ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 +
-                        ST_freq_13 + ST_freq_14 + ST_freq_15 + as.factor(Predation) + Tparasites_scaled, rnd = list(Site=~1),  
-        family = family, data = data_models, lambda=lambda[opt],switch.NR=FALSE,final.re=FALSE)
-         
-  
-        
-summary(glm2_final)
-```
-
-*next steps and thoughts*
-fit models with the arcsin transformed data, still bounded between 0 and 1 but normal distribution
-Need to do different model structures and generate model table like parrot fish paper (dredging)
-remove populations with no parasites (do I do this for all models or just the parasite one)
-
-```{r individual level model orange, eval = FALSE}
-#significant effect when Site is not a random effect, site is contributing most of the variation
-model_o <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
 summary(model_o)
+summary(model_b)
 
-model_o <- lmer(Orange ~ Tparasites + PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
-summary(model_o)
+#visualization
 
-model_o2 <- lmer(Orange_arcsin ~ PC1 + PC2 + Predation + (1|Drainage/Site), data = data_models)
-summary(model_o2)
-
-model_o3 <- lmer(Orange_arcsin ~ Tparasites + PC1 + Predation + (1|Drainage/Site), data = data_models)
-summary(model_o3)
-
-model_o4 <- lmer(Orange_arcsin ~ Tparasites + PC1 + PC2 + (1|Drainage/Site), data = data_models)
-summary(model_o4)
-
-ggplot(data = data_models, aes(x = PC1, y = Orange, colour = Predation)) + geom_point() + facet_wrap(~Drainage)
-ggplot(data = data_models, aes(x = Tparasites, y = Orange, colour = Predation)) + geom_point() + facet_wrap(~Drainage)
-```
-
-
-Trying a dredge approach with each of the individual models to get consensus on most important variables
-Currently: 
-+ Predation in every model 
-+ varying all ST frequency variables and richness variables
-+ colour models have number of parasites as a predictor possibility
-
-To Do:
-+ exclude populations with no parasites for the parasite model (double check if I've done this already)
-+ correct the parasite model so it appropriately handles the count data
-+ retain the parasite free populations for colour models and don't use parasites as a predictor
-+ add code for both with and without the turure populations (since these are introductions)
-+ model averaging?? (read parrot fish paper)
-
-```{r dredge black, eval = FALSE}
-
-#double checking there are no NAs, but we need to use na.fail because it prevents comparing mdoels with different datasets as the default drops observations with NA in any variable
-data_models %>% 
-  summarise(across(c(Black_arcsin, Tparasites_scaled, Ai, STi,  ST_freq_1:ST_freq_9, ST_freq_11:ST_freq_15, Predation), ~ sum(is.na(.), na.rm=FALSE)))
-
-fm.black<- lmer(Black_arcsin ~ Tparasites_scaled + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
-
-#with out correlated variables, I will not force it to include ecological variables for now to see what we get (example from dredge function demo for excluding correlated vars)
-# Suppose we want to have a set of models excluding combinations of collinear
-# variables that are significantly (p < 0.05) correlated, with Pearson
-# correlation coefficient r > 0.5
-
-# I did this but it only excludes a couple of combinations for the dredging and is not optimized to make sure Predation is always included.
-is.correlated <- function(i, j, data, conf.level = 0.95, cutoff = 0.5, ...) {
- 	if(j >= i) return(NA)
- 	ct <- cor.test(data[, i], data[, j], conf.level = conf.level, ...)
- 	ct$p.value > (1 - conf.level) || abs(ct$estimate) <= cutoff
- }
-
-# Need vectorized function to use with 'outer'
-vCorrelated <- Vectorize(is.correlated, c("i", "j"))
-
-# Create logical matrix
-smat <- outer(1:17, 1:17, vCorrelated, data = data_models[,c(15:30,49)])
-
-nm <- colnames(data_models[,c(15:30,49)])
-
-dimnames(smat) <- list(nm, nm) #only removes a couple combinations
-
-dredge_black<-dredge(fm.black, subset = smat) #very slow to run, cluster this?
-```
-
-remove any populations that do not have any parasites to create an appropriate dataset for the parasite model
-keep these populations in the colour model.
-
-```{r parasite model data prep}
-#prep dataframe for this analysis, subset of data that includes only populations with parasites
-parasite_free_pops <- data_models %>% 
-  group_by(Site) %>% 
-  summarize(parasites = sum(Tparasites)) %>% 
-  filter(parasites == 0) %>% 
-  pull(Site)
-
-data_models_para_only<-data_analysis %>% 
-  filter(!Site %in% parasite_free_pops) %>% 
-  mutate(Orange_arcsin = asin(sqrt(Orange)),
-         Black_arcsin = asin(sqrt(Black))) %>% # arcsin transform both Orange and Black
-  mutate(Tparasites_scaled = Tparasites,
-         Orange_scaled = Orange,
-         Black_scaled = Black) %>% #add variables for scaling and use as predictors
-  mutate(Site = as.factor(as.character(Site))) # reclassify this to remove the extra level from Arima2
-
-#change NA to 0 for frequency columns (to prevent model dropping??)
-data_models_para_only[c(17:30)][is.na(data_models_para_only[c(17:30)])] <- 0 #changing frequencies to 0 if ST is not present
-data_models_para_only[,c(10:11,15:30,33:35)]<-scale(data_models_para_only[,c(10:11,15:30,33:35)], center=T, scale=T) #scaling continuous predictors
-
-#definitely zero-inflated count data
-hist(data_models_para_only$Tparasites)
-#checking data structure, overdispersion?
-plot(mean(data_models_para_only$Tparasites), var(data_models_para_only$Tparasites)) #if var > mean it's overdispersed (true)
-```
-
-```{r checking levels}
-data_analysis %>% 
-  filter(!Site %in% parasite_free_pops) %>% 
-  filter(Drainage == "Caroni") %>% 
-  group_by(Site) %>% 
-  summarize_at(vars(ST_freq_1:ST_freq_15), sum, na.rm = T) # no instances of ST 14 and 3 should be removed
-
-data_analysis %>% 
-  filter(!Site %in% parasite_free_pops) %>% 
-  filter(Drainage == "North Slope") %>% 
-  group_by(Site) %>% 
-  summarize_at(vars(ST_freq_1:ST_freq_15), sum, na.rm = T) # no instances of ST 12 and 4 should be removed from drainage dredge model
-
-#something is not right with ST 8 in the North Slope model
-ggplot(data_analysis %>% filter(Drainage == "North Slope"), aes(ST_freq_8, Tparasites, colour = Site)) + geom_jitter() #no fish with ST 8 have parasites
-
-parasites_w_ST <- function(parasite_col, ST_col) {
-  sum(parasite_col[!is.na(ST_col)])
-}
-
-## Looking into the Std error issue with ST 8 in the North Slope
-#looks like no fish that have this ST have any parasites so the model is confused?
-data_analysis %>% 
-  filter(Drainage == "North Slope") %>% 
-  filter(!is.na(ST_freq_8))
-
-#checking if this occurs elsewhere in the dataset, but we good
-data_analysis %>% 
-  group_by(Drainage) %>% 
-  summarize(sum_para_ST1 = parasites_w_ST(Tparasites, ST_freq_1),
-            sum_para_ST2 = parasites_w_ST(Tparasites, ST_freq_2),
-            sum_para_ST3 = parasites_w_ST(Tparasites, ST_freq_3),
-            sum_para_ST4 = parasites_w_ST(Tparasites, ST_freq_4),
-            sum_para_ST5 = parasites_w_ST(Tparasites, ST_freq_5),
-            sum_para_ST6 = parasites_w_ST(Tparasites, ST_freq_6),
-            sum_para_ST7 = parasites_w_ST(Tparasites, ST_freq_7),
-            sum_para_ST8 = parasites_w_ST(Tparasites, ST_freq_8),
-            sum_para_ST9 = parasites_w_ST(Tparasites, ST_freq_9),
-            sum_para_ST11 = parasites_w_ST(Tparasites, ST_freq_11),
-            sum_para_ST12 = parasites_w_ST(Tparasites, ST_freq_12),
-            sum_para_ST13 = parasites_w_ST(Tparasites, ST_freq_13),
-            sum_para_ST14 = parasites_w_ST(Tparasites, ST_freq_14),
-            sum_para_ST15 = parasites_w_ST(Tparasites, ST_freq_15))
+#ggplot orange
+ data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_jitter(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Tparasites, y = Orange, colour = Drainage),
+             width = 0.1, height = 0.0,
+             alpha = 0.5) +
+  xlab("Individual Parasite Load") +
+  ylab("Relative Area Orange")
+ 
+#ggplot black
+ data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_jitter(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Tparasites, y = Black, colour = Drainage),
+             width = 0.1, height = 0.0,
+             alpha = 0.5) +
+  xlab("Individual Parasite Load") +
+  ylab("Relative Area Black")
 
 ```
 
+individual level no colour
+```{r parasite mm}
+model_para <- glmer(Tparasites ~ Ai + STi + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "poisson")
 
-FIX alternative oropouche spellings (PopDF has oropuche)
-```{r parasite model dredge}
+check_model(model_para)
 
-data_models_para_only_caroni <- data_models_para_only %>% filter(Drainage == "Caroni")
-data_models_para_only_north <- data_models_para_only %>% filter(Drainage == "North Slope")
+summary(model_para)
 
-if(MuMIn:::.parallelPkgCheck(quiet = TRUE)) {
-}
-if (FALSE) {require(parallel) || require(snow)} # usually this is run?
-
-#set up cluster for parallel processing
-no_cores <- detectCores() - 1
-clust <- makeCluster(no_cores)
-
-#load MuMIn package and model1 onto cluster
-clusterExport(clust, "data_models_para_only_caroni")
-clusterExport(clust, "data_models_para_only_north")
-clusterEvalQ(clust, library("lme4"))
-clusterEvalQ(clust, library("MuMIn"))
-
-
-#specify the full model for each response variable and dredge the combination models, moved to drainage specific models as global model was singular and had no variance explained by Drainage random factor. Models still singular, less than 5 levels for river
-
-#no complete separation but still singular
-#fm_para_car_nb<- glmer.nb(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_15  + (1|River/Site), na.action = "na.fail", data = data_models_para_only_caroni, control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=1e5)), verbose = T)
-
-#still complete separation....
-#fm_para_nor_nb<- glmer.nb(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|River/Site), na.action = "na.fail", data = data_models_para_only_north, control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=1e5)), verbose = T)
-
-#both are singular fits
-fm_para_car_mm<- glmer(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_15  + (1|River/Site), na.action = "na.fail", data = data_models_para_only_caroni, family = "poisson")
-
-#with ST_8: there is no explanatory power for this predictor because all fish with ST_8 have 0 parasites in this drainage and there's a small sample size (N=4), removing for now
-#fm_para_nor_mm<- glmer(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|River/Site), na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
-
-fm_para_nor_mm<- glmer(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_9+ ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|River/Site), na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
-
-fm_para_nor_mm_ST8<- glmer(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + (1|River/Site), na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
-
-print(system.time(dredge_para_car_mm<-dredge(fm_para_car_mm, fixed = c("Predation"), rank="AICc", extra = "R^2", cluster = clust)))
-
-print(system.time(dredge_para_nor_mm<-dredge(fm_para_nor_mm, fixed = c("Predation"), rank="AICc", extra = "R^2", cluster = clust)))
-
-print(system.time(dredge_para_nor_mm_ST8<-dredge(fm_para_nor_mm_ST8, fixed = c("Predation"), rank="AICc", extra = "R^2", cluster = clust)))
-
-
-# I am excluding this drainage specific model due to insufficient sample size
-#only one predation regime, 2 rivers with 1 site each (no convergence)
-#fm_para_oro<- glm(Tparasites ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Site, na.action = "na.fail", data = (data_models_para_only %>% filter(Drainage == "Oropouche")),family = "poisson")
-
-
-# as fixed effects due to singularity issues, gets NA estimates for site
-
-#the caroni only model is not estimating ST 15 for some reason, ST 15 is present in most of the populations?
-fm_para_car<- glm(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_15 + River + Site, na.action = "na.fail", data = data_models_para_only_caroni, family = "poisson")
-
-print(system.time(dredge_para_car<-dredge(fm_para_car, fixed = c("Predation", "River", "Site"), rank="AICc", extra = "R^2", cluster = clust)))
-
-#with ST_8: there is no explanatory power for this predictor because all fish with ST_8 have 0 parasites in this drainage and there's a small sample size (N=4), removing for now
-#fm_para_nor<- glm(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + River, na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
-
-fm_para_nor<- glm(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_9 + ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + River, na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
-
-print(system.time(dredge_para_nor<-dredge(fm_para_nor, fixed = c("Predation", "River", "Site"), rank="AICc", extra = "R^2", cluster = clust)))
-
-fm_para_nor_ST8<- glm(Tparasites ~ Predation + Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9 + ST_freq_11 + ST_freq_13 + ST_freq_14 + ST_freq_15 + River, na.action = "na.fail", data = data_models_para_only_north, family = "poisson")
-
-print(system.time(dredge_para_nor_ST8<-dredge(fm_para_nor_ST8, fixed = c("Predation", "River", "Site"), rank="AICc", extra = "R^2", cluster = clust)))
-
-
-stopCluster(clust)
-
-
-#saving these because it takes a long time to dredge these models
-#save.image(file='output/DredgeModelsEnvironment.RData')
+#visualize this doesn't look right yet
+data.frame(ggeffects::ggpredict(model_para, terms = c("Ai", "Predation"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_point(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Ai, y = Tparasites, colour = Predation),
+             alpha = 0.5) +
+  xlab("MHC Allelic Richness") +
+  ylab("Individual Parasite Load")
 ```
-
-
-Then average models above a delta cut-off. Using 2 here, however some literature suggests 6 is an appropriate cut-off
-Using a delta of 6 based on Richards (2011). "Many published model selection studies use a cut-off of Δ ≤ 2, to include only those models with ‘substantial support’ from the data (Burnham and Anderson 2001, p114). However, simulations suggest that this rule is too stringent, and a cut-off threshold of Δ ≤ 6 is often necessary to be 95% sure that the truly most parsimonious model is retained within the confidence set (Richards 2005, 2008)."
-
-"With <5 levels, the mixed model may not be able to estimate the among-population variance accurately. In this case, the variance estimate will either collapse to zero, making the model equivalent to an ordinary GLM (Gelman & Hill, 2007, p. 275) or be non-zero but incorrect if the small number of groups that were sampled are not representative of true distribution of means (Harrison, 2015)."
--> this is a potential reason why it's singular, drainage only has 3 levels
-
-+ predation always as fixed due to 2 levels, drainage has 3 levels and sometimes this is insufficient to account for variation
-+ dredge these multiple models separately and interpret each drainage, using different evolutionary histories to explain why this is needed
-+ model average the dredge models
-+ can't really do model averaged effect size (pkg - AICcmodavg) except for categorical comparisons (so basically only Predation which isn't of interest here)
-```{r model interpretation}
-# best and null models
-models_sub_para_car <- get.models(dredge_para_car, subset = delta <= 2)
-models_sub_para_nor <- subset(dredge_para_nor, delta < 2)
-
-models_sub_para_car_mm <- get.models(dredge_para_car_mm, subset = delta <= 2)
-models_sub_para_nor_mm <- subset(dredge_para_nor_mm, delta < 2)
-
-#output
-summary(model.avg(dredge_para_car, subset = delta <= 2))
-summary(model.avg(dredge_para_nor, subset = delta <= 2))
-summary(model.avg(dredge_para_nor_ST8, subset = delta <= 2))
-
-summary(model.avg(dredge_para_car_mm, subset = delta <= 2))
-summary(model.avg(dredge_para_nor_mm, subset = delta <= 2))
-summary(model.avg(dredge_para_nor_mm_ST8, subset = delta <= 2))
-
-plot(model.avg(dredge_para_car, subset = delta <= 2))
-plot(model.avg(dredge_para_nor, subset = delta <= 2))
-plot(model.avg(dredge_para_nor_ST8, subset = delta <= 2))
-
-plot(model.avg(dredge_para_car_mm, subset = delta <= 2))
-plot(model.avg(dredge_para_nor_mm, subset = delta <= 2))
-plot(model.avg(dredge_para_nor_mm_ST8, subset = delta <= 2))
-
-
-#one parameter at a time with this package but gives confint, create a loop and go through the variables (AICcModAvg package)
-#modavg(models_sub_para_car_mm, parm = "ST_freq_9", second.ord = TRUE, uncond.se = "revised", conf.level = 0.95)
-
-```
-
-
-move to drainage specific models to see if this fixes the singular fit...It does not and we have complete separation in nb model
-```{r parallel dredge colour, eval = false}
-if(MuMIn:::.parallelPkgCheck(quiet = TRUE)) {
-}
-if (FALSE) {require(parallel) || require(snow)} # usually this is run?
-
-#set up cluster for parallel processing
-no_cores <- detectCores() - 1
-clust <- makeCluster(no_cores)
-
-#load MuMIn package and model1 onto cluster
-clusterExport(clust, "data_models")
-clusterEvalQ(clust, library("MuMIn")) # 1.5 hours with no clustering, 10 minutes with
-
-#specify the full model for each response variable and dredge the combination models
-
-#black across drainages is singular, trying drainage specific models to help simplify random effect structure. Caroni does not have enough sites (and one is turure)
-#fm.black<- lme4::lmer(Black_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models) #singular
-
-fm.black2<- lme4::lmer(Black_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site), 
-                       na.action = "na.fail", 
-                       data = data_models %>% filter(Drainage == "North Slope"))
-
-fm.black3<- lme4::lmer(Black_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Site), 
-                       na.action = "na.fail", 
-                       data = data_models %>% filter(Drainage == "Caroni"))
-
-print(system.time(dredge_black_north<-dredge(fm.black2, fixed = "Predation", rank=AIC, cluster = clust))) # can't filter?
-print(system.time(dredge_black_caroni<-dredge(fm.black3, fixed = "Predation", rank=AIC, cluster = clust)))
-
-#orange
-fm.orange<- lme4::lmer(Orange_arcsin ~ Ai + STi + ST_freq_1 + ST_freq_2 + ST_freq_3 + ST_freq_4 + ST_freq_5 + ST_freq_6 + ST_freq_7 + ST_freq_8 + ST_freq_9+ ST_freq_11 + ST_freq_12 + ST_freq_13 + ST_freq_14 + ST_freq_15 + Predation + (1|Drainage/Site), na.action = "na.fail", data = data_models)
-
-#print(system.time(dredge_orange<-dredge(fm.orange, fixed = c("Predation", "Ai", "STi"), rank=AIC, cluster = clust)))
-print(system.time(dredge_orange<-dredge(fm.orange, fixed = "Predation", rank=AIC, cluster = clust)))
-
-# best models and null model
-models_sub_black_north <- subset(dredge_black_north, delta < 6)
-models_sub_black_caroni <- subset(dredge_black_caroni, delta < 6)
-
-models_sub_orange <- subset(dredge_orange, delta < 6)
-
-stopCluster(clust)
-```
-
 
 
 #### Linear models for population level
@@ -756,18 +319,17 @@ summary(model_str)
 
 moving to a more appropriate mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site). 
 
-river column edit NOTE move this up to data cleaning section
 ```{r microsat mixed model}
-PopDF <- PopDF %>% #create river column 
-  mutate(River = as.factor(gsub('[0-9]+', '', Site))) %>% 
-  mutate(Drainage_simple = gsub(' \\(Caroni type\\)', '', Drainage)) #creates a simplified column for drainage that includes turure
 
 #Predation regime may contribute variance but only has two levels and will be added as a fixed factor
 model_micro <- lmer(`Micro-Ar` ~ `MHC-STr` + `MHC-Ar` + Predation + (1|Drainage/River), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+
+check_model(model_micro)
 summary(model_micro)
 
-#run with and without turure (since it's an introduction), conclusions are the same
+#run with and without turure (since it's an introduction), conclusions are the same so use that (larger sample size)
 model_micro_all <- lmer(`Micro-Ar` ~ `MHC-STr` + `MHC-Ar` + Predation + (1|Drainage_simple/River), data = PopDF)
+check_model(model_micro_all)
 summary(model_micro_all)
 
 #effect size
@@ -777,12 +339,67 @@ model_micro_all_r2 <- r2beta(model_micro_all) #marginal r2
 plot(model_micro_all_r2)
 
 #plots of these factors
-ggplot(PopDF, aes(`MHC-Ar`, `Micro-Ar`, colour = Drainage_simple)) + geom_point(aes(shape = Predation)) + geom_smooth(method=lm , se=FALSE)
+
+data.frame(ggeffects::ggpredict(model_micro_all, terms = c("MHC-Ar", "Predation"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_point(inherit.aes = FALSE,
+             data = PopDF,
+             aes(x = `MHC-Ar`, y = `Micro-Ar`, colour = Predation),
+             alpha = 0.5) +
+  xlab("Microsatellite Richness") +
+  ylab("MHC Allelic Richness")
+
 ```
 
 
-Could try population level model for parasite dredging due to singularity issues
-QW suggested bayesian before pop level
+Population level colour models, with prevalence
+
+There's just too few data points to do mized models at this level I think.
+```{r pop mm}
+PopDF_parasites <- PopDF %>% 
+  filter(!Site %in% no_parasite_sites) %>% 
+  filter(Site != "ElCedro1") %>%  #removed in original study, parasite prev an order of magnitude below others
+  mutate(Site = as.factor(as.character(Site))) %>% 
+  rename(prevalence = `Gyrodactylus prevalence`, mhc_Ai = `MHC-Ar`, mhc_STi = `MHC-STr`)
+
+model_pop_o <- lm(mean_o ~ prevalence + mhc_Ai + mhc_STi + Predation, data = PopDF_parasites) 
+
+model_pop_b <- lm(mean_b ~ prevalence + mhc_Ai + mhc_STi + Predation, data = PopDF_parasites) 
+
+check_model(model_pop_o) #not good
+check_model(model_pop_b)
+
+summary(model_pop_o)
+summary(model_pop_b)
+
+#visualization
+#ggplot orange
+ data.frame(ggeffects::ggpredict(model_pop_o, terms = c("mhc_Ai"))) %>% 
+  ggplot(aes(x = x, y = predicted)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error),fill = "orange", alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted), colour = "orange") +
+  geom_point(inherit.aes = FALSE,
+             data = PopDF_parasites,
+             aes(x = mhc_Ai, y = mean_o),
+             alpha = 0.5, colour = "orange") +
+  xlab("MHC Allelic Richness") +
+  ylab("Average Relative Area Orange")
+ 
+#ggplot black
+ data.frame(ggeffects::ggpredict(model_pop_b, terms = c("mhc_Ai"))) %>% 
+  ggplot(aes(x = x, y = predicted)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted)) +
+  geom_point(inherit.aes = FALSE,
+             data = PopDF_parasites,
+             aes(x = mhc_Ai, y = mean_b),
+             alpha = 0.5) +
+  xlab("MHC Allelic Richness") +
+  ylab("Average Relative Area Black")
+```
+
 
 
 ### Figures
