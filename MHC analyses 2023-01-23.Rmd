@@ -154,7 +154,7 @@ no_parasite_sites <- data_analysis %>%
   filter(max < 1) %>% 
   pull(Site)
 
-data_matrices <-data_analysis %>% 
+data_matrices <- data_analysis %>% 
   filter(!Site %in% no_parasite_sites) %>% 
   filter(Site != "ElCedro1") #removed in original study, parasite prev an order of magnitude below others
 
@@ -187,8 +187,9 @@ mhc_r_matrix <- data_matrices %>%
 Permutation test with 1000 bootstrap replications to test significance of co-variation in COIA
 
 If we were to address the drainage comment from first reviewers we would want to split these data frames where possible to be drainage specific, not sure if there's sufficient sites for that
+I did a quick visualization of 
 
-```{r coia}
+```{r coia individual level}
 # pcas, currently keeping all factors
 pca_colour <- dudi.pca(colour_matrix, scale = TRUE, scannf = FALSE, nf = 3) # because parasite counts and relative area have different scales
 pca_mhc_f <- dudi.pca(mhc_f_matrix, scale = FALSE, scannf = FALSE, nf = 10) #same scale
@@ -197,10 +198,10 @@ pca_mhc_r <- dudi.pca(mhc_r_matrix, scale = FALSE, scannf = FALSE, nf = 2) #same
 # for both COIN analyses the screeplot indicates only the first factor is significantly contributing, should we only keep 1?
 
 #COIN 1 - colour and MHC ST frequency
-coin_1 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_f, scannf = FALSE, nf = 2) #manually put axes to keep
+coin_1 <- coinertia(dudiY = pca_colour, dudiX = pca_mhc_f, scannf = FALSE) #manually put axes to keep
 
 #COIN 2 - colour and allelic richness
-coin_2 <- coinertia(dudiX = pca_colour, dudiY = pca_mhc_r, scannf = FALSE, nf = 2) #manually put axes to keep
+coin_2 <- coinertia(dudiY = pca_colour, dudiX = pca_mhc_r, scannf = FALSE) #manually put axes to keep
 
 #permutation test
 rv1 <- RV.rtest(pca_colour$tab, pca_mhc_f$tab, 1000)
@@ -208,6 +209,73 @@ plot(rv1) # simulated p = 0.001, RV = 0.11
 
 rv2 <- RV.rtest(pca_colour$tab, pca_mhc_r$tab, 1000)
 plot(rv2) # simulated p = 0.374, RV = 0.014
+
+plot(coin_1)
+plot(coin_2)
+```
+
+
+"Within-class analyses take into account a partition of individuals into groups and focus on structures which are common to all groups." Dray & Dufour, 2007
+
+I'm pretty sure this is the way to anlayze this data and account for drainage differences, but we lose our significant (but weak) covariation. So basically correlations between colour and parasite load are explained by drainage level processes
+```{r within group}
+#doing a within group analysis for drainage level, this only looks at common processes across groups?
+
+wca_colour <- wca(pca_colour, fac = data_matrices$Drainage, scannf = FALSE)
+wca_mhc_f <- wca(pca_mhc_f, fac = data_matrices$Drainage, scannf = FALSE) 
+
+plot(wca_mhc_f)
+plot(wca_colour)
+
+coin_3 <- coinertia(dudiY = wca_colour, dudiX = wca_mhc_f, scannf = FALSE)
+plot(coin_3)
+
+#permutation test
+rv3 <- RV.rtest(wca_colour$tab, wca_mhc_f$tab, 1000)
+plot(rv3) # p-value = 0.26, rv = 0.035
+
+#with site?
+wca_colour_2 <- wca(pca_colour, fac = data_matrices$Site, scannf = FALSE)
+wca_mhc_f_2 <- wca(pca_mhc_f, fac = data_matrices$Site, scannf = FALSE) 
+
+plot(wca_mhc_f_2)
+plot(wca_colour_2)
+
+coin_4 <- coinertia(dudiY = wca_colour_2, dudiX = wca_mhc_f_2, scannf = FALSE)
+plot(coin_4)
+
+#permutation test
+rv4 <- RV.rtest(wca_colour_2$tab, wca_mhc_f_2$tab, 1000)
+plot(rv4) # rv = 0.023, p-value = 0.69
+
+#between class analysis?
+bca_colour <- bca(pca_colour, fac = data_matrices$Drainage, scannf = FALSE)
+bca_mhc_f <- bca(pca_mhc_f, fac = data_matrices$Drainage, scannf = FALSE) 
+
+plot(bca_mhc_f)
+plot(bca_colour)
+
+coin_5 <- coinertia(dudiY = bca_colour, dudiX = bca_mhc_f, scannf = FALSE)
+plot(coin_5)
+
+#permutation test
+rv5 <- RV.rtest(bca_colour$tab, bca_mhc_f$tab, 1000)
+plot(rv5) # rv = 0.70, p-value = 1
+
+
+#for the other dataset
+bca_mhc_r <- bca(pca_mhc_r, fac = data_matrices$Drainage, scannf = FALSE) 
+
+plot(bca_mhc_r)
+plot(bca_colour)
+
+coin_6 <- coinertia(dudiY = bca_colour, dudiX = bca_mhc_r, scannf = FALSE)
+plot(coin_6)
+
+#permutation test
+rv6 <- RV.rtest(bca_colour$tab, bca_mhc_r$tab, 1000)
+plot(rv6) # rv = 0.61, p-value = .66
+
 ```
 
 
