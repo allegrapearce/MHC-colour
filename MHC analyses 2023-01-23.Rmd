@@ -274,7 +274,9 @@ plot(coin_6)
 
 #permutation test
 rv6 <- RV.rtest(bca_colour$tab, bca_mhc_r$tab, 1000)
+
 plot(rv6) # rv = 0.61, p-value = 0.66
+
 
 ```
 
