@@ -397,7 +397,6 @@ cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST11, method = "pearson")
 
 
 #### individual level mixed models
-<<<<<<< HEAD
 
 Move to linear mixed models that control for both predation and drainage, these are replacements for the wilcoxon but with some more thought into model structure and questions
 
@@ -452,62 +451,7 @@ plot(model_b_r2)
 
 ```
 
-=======
 
-Move to linear mixed models that control for both predation and drainage, these are replacements for the wilcoxon but with some more thought into model structure and questions
-
-Edit axes so they go to the maximum predicted values by increments of 1 (12, that's the highest parasite load)
-```{r individual level, include=FALSE, eval=FALSE}
-data_analysis_parasites <- data_analysis %>% 
-  filter(!Site %in% no_parasite_sites) %>% 
-  filter(Site != "ElCedro1") %>%  #removed in original study, parasite prev an order of magnitude below others
-  mutate(Site = as.factor(as.character(Site))) 
-
-model_o <- lmer(Orange ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #north drainage and low pred almost sig
-model_b <- lmer(Black ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #oropouche drainage sig
-
-check_model(model_o)
-check_model(model_b)
-
-summary(model_o)
-summary(model_b)
-
-model_o_r2 <- r2beta(model_o)
-model_b_r2 <- r2beta(model_b)
-plot(model_o_r2)
-plot(model_b_r2)
-
-#visualization
-
-#ggplot orange
- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
-  ggplot(aes(x = x, y = predicted, group = group)) +
-  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
-  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
-  geom_jitter(inherit.aes = FALSE,
-             data = data_analysis_parasites,
-             aes(x = Tparasites, y = Orange, colour = Drainage),
-             width = 0.1, height = 0.0,
-             alpha = 0.5) +
-  xlab("Individual Parasite Load") +
-  ylab("Relative Area Orange")
- 
-#ggplot black
- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
-  ggplot(aes(x = x, y = predicted, group = group)) +
-  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
-  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
-  geom_jitter(inherit.aes = FALSE,
-             data = data_analysis_parasites,
-             aes(x = Tparasites, y = Black, colour = Drainage),
-             width = 0.1, height = 0.0,
-             alpha = 0.5) +
-  xlab("Individual Parasite Load") +
-  ylab("Relative Area Black")
-
-```
-
->>>>>>> individual-models
 individual level no colour
 ```{r parasite mm}
 model_para <- glmer(Tparasites ~ Ai + STi + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "poisson")
@@ -702,11 +646,8 @@ boxplot(Black ~ Predation, data = MHCDF)
 boxplot(Black ~ drainage, data = MHCDF)
 boxplot(Black ~ Predation * drainage, data = MHCDF)
 ```
-<<<<<<< HEAD
 
 
-=======
->>>>>>> individual-models
 ```{r ZombieFig2}
 #Zombie Figure 2
 #gyrodactylus prevelance vs. colour
@@ -776,11 +717,7 @@ plot(x = tempDF$`MHC-STr`, y = (tempDF$mean_b)
      , xlab = "Population MHC Supertype Richness"
      , ylab = "Black"
      , las = 1
-<<<<<<< HEAD
      , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17)))
-=======
-     , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17))))
->>>>>>> individual-models
 abline(lm(mean_b ~ `MHC-STr`, data = tempDF)) #not working
 legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
        # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
