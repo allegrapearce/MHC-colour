@@ -140,13 +140,9 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 * microsatellite linear models   
   + I added a predation and drainage effect, but I'm not sure if this is right (DONE?) 
 * boxplot and other visualization/figure recreation with individual data   
-<<<<<<< HEAD
 * COIA per drainage
   + Within-class analysis
-
-=======
 * Zombie Plot 1 - Turure is not with a symbol (need to also run analyses with and without Turure)
->>>>>>> 6fe679f36e2469702ecb37396eed29c6c96f8689
 
 
 #### Co-inertia analyses
