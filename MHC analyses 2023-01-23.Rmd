@@ -23,9 +23,10 @@ library(MuMIn)
 library(lme4)
 library(performance)
 library(effectsize)
-library("r2glmm")
+library(r2glmm)
 library(ggplot2)
 library(ggiraphExtra)
+library(corrr)
 ```
 
 ### Data Prep
@@ -103,19 +104,19 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 ### *Reviewers Comments*
 
 * They mentioned replicating analyses with both drainages separately so we can confirm trends across drainages   
-  + COIA, I don't think we can add drainage but we could do a drainage specific COIA?   
-  + Adding a drainage term in richness models?   
+  + COIA, added a within-class analysis to assess common pattersn without drainage level variation
 
 * Why use parametric and non-parametric tests?   
   + by switching to linear models we aren't mixing parametric and non-parametric anymore   
 
 * Adding in the data from the different years too   
   + We did this, it allowed us to move to individual level analysis   
+  + It's all 2010 for colour stuff, 2009 included in MHC classification work
 
 * Changing to Individual level analyses to leverage the new data   
-  + COIA (DONE, but is this best?)   *look into COIA interpretation more*
+  + COIA (DONE but peesent population level, added a within class analysis)
   + Wilcoxon - change to models with individual data (DONE)   
-  + Microsatellite - keep at pop level 
+  + Microsatellite - keep at pop level (DONE, do we need the fixed factors?)
 
 ### Analysis To Do: 
 
@@ -125,22 +126,20 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
   + Run PCAs (DONE)   
   + bootstrapping for COIA to test significance (DONE)   
   + pearson's correlation coefficient test (maybe???) *I am not sure about this*   
-  + Visualization (In progress)   
+  + Visualization (DONE)   
 * richness linear models (micro-Ar as independent, Ai and STi as dependent) (DONE)   
 * Wilcoxon rank-sum test on all variables by predation level (DONE)   
 * Wilcoxon rank-sum test on all variables by drainage (DONE-Caroni & North)   
 
 ###### NEW and IMPROVED Analysis   
-* predation and drainage tests (In Progress)   
+* predation and drainage tests (DONE)   
   + move to linear mixed models that test for predation and drainage   
   + use data_analysis df with individual level data   
-  + Not all individuals have all ST, drop NAs? How will this impact model?   
 * microsatellite linear models   
-  + check if microsatellite data has individual level in Jackie's thesis   
-  + *maybe* re-do richness linear models with individual level data if available   
+  + I added a predation and drainage effect, but I'm not sure if this is right (DONE?) 
 * boxplot and other visualization/figure recreation with individual data   
-* COIA per drainage?
-  + do we want to address this comment?
+* COIA per drainage
+  + Within-class analysis
 
 
 
@@ -155,11 +154,13 @@ no_parasite_sites <- data_analysis %>%
   group_by(Site) %>% 
   summarise(max = max(Tparasites)) %>% 
   filter(max < 1) %>% 
+  mutate(Site = droplevels(Site)) %>% # Drop unused levels
   pull(Site)
 
 data_matrices <- data_analysis %>% 
   filter(!Site %in% no_parasite_sites) %>% 
-  filter(Site != "ElCedro1") #removed in original study, parasite prev an order of magnitude below others
+  filter(Site != "ElCedro1") %>% #removed in original, parasite prev order of magnitude below
+  mutate(Site = droplevels(Site))
 
 ### Parasite and colour
 #Note: not using InfectedBinary because it should have less explanatory power than Tparasites
@@ -351,7 +352,6 @@ Pearson's Correlations on key interactions at population level
 Not sure where to add this in the MS
 ```{r PCC}
 #correlation plot
-library(corrr)
 PopDF_parasites %>% 
   correlate() %>% 
   focus(prevalence)
@@ -370,6 +370,27 @@ cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST10, method = "pearson") #
 cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST11, method = "pearson") #sig
 cor.test(PopDF_parasites$prevalence, PopDF_parasites$mean_o, method = "pearson") # strong but insig p = 0.09
 cor.test(PopDF_parasites$prevalence, PopDF_parasites$mean_b, method = "pearson")
+
+PopDF_parasites %>% 
+  correlate() %>% 
+  focus(mean_o)
+
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$mhc_STi, method = "pearson") #sig
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$mhc_Ai, method = "pearson") #sig
+
+#of the ST none correlated with orange
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST1, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST2, method = "pearson") 
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST3, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST4, method = "pearson") 
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST5, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST6, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST7, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST8, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST9, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST10, method = "pearson") 
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST11, method = "pearson") 
+
 ```
 
 
@@ -446,7 +467,7 @@ data.frame(ggeffects::ggpredict(model_para, terms = c("Ai", "Predation"))) %>%
              aes(x = Ai, y = Tparasites, colour = Predation),
              alpha = 0.5) +
   xlab("MHC Allelic Richness") +
-  ylab("Individual Parasite Load")
+  ylab("Individual Parasite Intensity")
 ```
 
 
