@@ -65,16 +65,17 @@ data_analysis <- MHCDF %>%
     filter(!is.na(Orange) & !is.na(Black) & Year == '2010' & Sex == 'Male')
 ```
 
-We have colour data for `r data_analysis %>% tally() %>% pull()` photos with corresponding MHC data, all photos were taken in 2010. These span `r n_distinct(data_analysis$Site)` sites. Below are the population specific means for relative area of both orange and black.
+We have colour data for `r data_analysis %>% tally() %>% pull()` photos with corresponding MHC data, all photos were taken in 2010. These span `r n_distinct(data_analysis$Site)` sites. Below are the sample sizes by population for colour and genetic analyses
 
 ```{r pop means, echo=FALSE, message = FALSE}
 pop_means <- data_analysis %>% 
   group_by(Site) %>% 
   summarize(mean_o = mean(Orange),
-            mean_b = mean(Black)) %>% 
-  add_row(data.frame(Site="All", mean_o=mean(data_analysis$Orange), mean_b=mean(data_analysis$Black)))
+            mean_b = mean(Black),
+            colour_n = n()) %>% 
+  add_row(data.frame(Site="All", mean_o=mean(data_analysis$Orange), mean_b=mean(data_analysis$Black), colour_n = nrow(data_analysis)))
 
-#adding to PopDF, removing populations with no colour data
+#adding to PopDF, removing populations with no colour data#adding to PopDF, removing populations with no colour dataOrange
 PopDF <- inner_join(PopDF, pop_means, by = 'Site')
 
 PopDF <- PopDF %>% #create river column 
@@ -82,7 +83,21 @@ PopDF <- PopDF %>% #create river column
   mutate(Drainage_simple = gsub(' \\(Caroni type\\)', '', Drainage)) %>%  #creates a simplified column for drainage that includes turure
   mutate(Drainage_simple = as.factor(Drainage_simple))
 
-#knitr::kable(pop_means, col.names = c("Site", "Mean Relative Orange", "Mean Relative Black"), "simple")
+knitr::kable((PopDF %>% select(c(1,2,4,21,24:26))), 
+             col.names = c("Sample Number (MHC)", "Predation", "Site", "Gyrodactylus Prevalence", "Sample Number (Colour)", "River", "Drainage"), "simple")
+
+#for export 
+write.table((PopDF %>% 
+  select(c(1, 2, 4, 21, 24:26)) %>% 
+  rename(
+    "Sample Number (MHC)" = 1,
+    "Predation" = 2,
+    "Site" = 3,
+    "Gyrodactylus Prevalence" = 4,
+    "Sample Number (Colour)" = 5,
+    "River" = 6,
+    "Drainage" = 7)),
+  "output/sample_size_table.csv", quote = FALSE, sep = ",", row.names = FALSE)
 ```
 
 
