@@ -417,6 +417,7 @@ Move to linear mixed models that control for both predation and drainage, these 
 
 Edit axes so they go to the maximum predicted values by increments of 1 (12, that's the highest parasite load)
 ```{r individual level, include=FALSE, eval=FALSE}
+library(gtsummary)
 data_analysis_parasites <- data_analysis %>% 
   filter(!Site %in% no_parasite_sites) %>% 
   filter(Site != "ElCedro1") %>%  #removed in original study, parasite prev an order of magnitude below others
@@ -428,8 +429,17 @@ model_b <- lmer(Black ~ Tparasites + Ai + STi + Predation + Drainage + Tparasite
 check_model(model_o)
 check_model(model_b)
 
+#currently presenting summary statistics in text
 summary(model_o)
 summary(model_b)
+#car::Anova(model_o)
+#car::Anova(model_b)
+
+# car anova output only giving p-value not chisq estimate?
+#to <- tbl_regression(car::Anova(model_o))
+#tb <- tbl_regression(car::Anova(model_b))
+#merged_tbl <- tbl_merge(tbls = list(to,tb),tab_spanner = c("**Orange**", "**Black**"))
+merged_tbl <- tbl_merge(tbls = list(tbl_regression(model_o),tbl_regression(model_b)),tab_spanner = c("**Orange**", "**Black**"))
 
 model_o_r2 <- r2beta(model_o)
 model_b_r2 <- r2beta(model_b)
@@ -471,9 +481,10 @@ individual level no colour
 ```{r parasite mm}
 model_para <- glmer(Tparasites ~ Ai + STi + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "poisson")
 
-check_model(model_para)
-
 summary(model_para)
+#car::Anova(model_para)
+
+tbl_regression(model_para, exponentiate = TRUE)
 
 #visualize this doesn't look right yet
 data.frame(ggeffects::ggpredict(model_para, terms = c("Ai", "Predation"))) %>% 
