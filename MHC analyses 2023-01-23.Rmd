@@ -535,13 +535,16 @@ summary(model_micro_str)
 #run with and without turure (since it's an introduction), conclusions are the same so use that (larger sample size)
 model_micro_all_ar <- lmer(`MHC-Ar` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF)
 
-check_model(model_micro_all_ar)
+#check_model(model_micro_all_ar)
 summary(model_micro_all_ar)
 
 model_micro_all_str <- lmer(`MHC-STr` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF)
 
-check_model(model_micro_all_str)
+#check_model(model_micro_all_str)
 summary(model_micro_all_str)
+
+merged_tbl2 <- tbl_merge(tbls = list(tbl_regression(model_micro_all_str),tbl_regression(model_micro_all_ar)),
+                        tab_spanner = c("**ST Richness**", "**Allelic Richness**"))
 
 #effect size
 
@@ -622,7 +625,7 @@ summary(model_pop_b)
 ```{r prevalence model}
 model_para_pop <- lmer(prevalence ~ mhc_Ai + mhc_STi + Predation + (1|Drainage), data = PopDF_parasites)
 
-check_model(model_para_pop)
+#check_model(model_para_pop)
 
 summary(model_para_pop)
 ```
@@ -703,6 +706,8 @@ legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17
 
 ```
 
+
+
 ```{r ZombieFig3}
 
 plot(x = tempDF$ST11, y = tempDF$`Gyrodactylus prevalence`
@@ -715,6 +720,8 @@ legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17
        , bty = "n", pt.cex = 1.3, cex = 1.05
        )
 ```
+
+
 
 ```{r ZombieFig4}
 plot(x = tempDF$`MHC-STr`, y = tempDF$`Gyrodactylus prevalence`
