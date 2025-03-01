@@ -385,7 +385,6 @@ cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST9, method = "pearson")
 cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST10, method = "pearson") #sig
 cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST11, method = "pearson") #sig
 cor.test(PopDF_parasites$prevalence, PopDF_parasites$mean_o, method = "pearson") # strong but insig p = 0.09
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$mean_b, method = "pearson")
 
 PopDF_parasites %>% 
   correlate() %>% 
@@ -393,6 +392,9 @@ PopDF_parasites %>%
 
 cor.test(PopDF_parasites$mean_o, PopDF_parasites$mhc_STi, method = "pearson") #sig
 cor.test(PopDF_parasites$mean_o, PopDF_parasites$mhc_Ai, method = "pearson") #sig
+
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$mhc_STi, method = "pearson") #sig
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$mhc_Ai, method = "pearson") #sig
 
 #of the ST none correlated with orange
 cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST1, method = "pearson")
