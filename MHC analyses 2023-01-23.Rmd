@@ -751,5 +751,54 @@ legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17
 rm(tempDF)
 ```
 
+Kiyoko finally making plots
+```{r manuscript_figures}
+#Figure 1: map DONE by Allegra
+
+# Figure 2: Drainage specific relationship between individual parasite load and relative area black.DONE by Allegra
+#ggplot black
+ data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_jitter(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Tparasites, y = Black, colour = Drainage),
+             width = 0.1, height = 0.0,
+             alpha = 0.5) +
+  xlab("Individual Parasite Load") +
+  ylab("Relative Area Black")
+
+# Figure S5 in Jackie’s stuff, remake, and include in main manuscript. Two panels, MicroAR on Y axis, one plot with MHC Ar, and one with MHC STr. different symbols for predation.
+# Figure S5. Linear models showing the relationship between MHC population allelic richness (MHC-Ar; black circles), supertype richness (MHC-STr; red circles), and microsatellite population allelic richness (Micro-Ar). A strong and significant relationship is observed among all population estimates of MHC-Ar and Micro-Ar (solid line, P=0.001, R2=0.41), and an insignificant relationship between MHC-STr and Micro-Ar (P= 0.289, R2=0.01). Open circles denote low predation site, and closed circles denote high predation sites.
+op <- par(mfrow = c(1,2))
+plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai
+     , xlab = "Microsattelite Allelic Richness", ylab = "MHC Allelic Richness"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
+     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     )
+legend(x = "topleft", c("High Predation", "Low Predation"), pch = c(21,22)
+       , bty = "n", pt.bg = c("red", "blue"), pt.cex = 2, cex = 1.05)
+plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi
+     , xlab = "Microsattelite Allelic Richness", ylab = "MHC Supertype Richness"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
+     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     )
+par(op)
+
+
+
+# 
+# Effect size visualiztion (lines 339-345) in ind. models manuscript.
+# 
+# two panel plot of orange/black separate, and by drainage
+# 
+# Co-intertia plots, Allegra has the scripts done, need to clean up. Two different Co inertia, original and then within class analysis. For now make a figure for both.
+# 
+# Supplemental materials, multi panel with insignificant stuff for colour.
+# 
+# S6 to S8 can be deleted. Redoing S1 map, Allegra has landmarks, keeping S2-S4, remake S5 (move to main manuscript)
+```
+
 
 
