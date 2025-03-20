@@ -755,7 +755,7 @@ Kiyoko finally making plots
 ```{r manuscript_figures}
 #Figure 1: map DONE by Allegra
 
-# Figure 2: Drainage specific relationship between individual parasite load and relative area black.DONE by Allegra
+# Figure 2: Drainage specific relationship between individual parasite load and relative area black.DONE by Allegra (orange in supp materials)
 #ggplot black
  data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
   ggplot(aes(x = x, y = predicted, group = group)) +
@@ -773,25 +773,31 @@ Kiyoko finally making plots
 # Figure S5. Linear models showing the relationship between MHC population allelic richness (MHC-Ar; black circles), supertype richness (MHC-STr; red circles), and microsatellite population allelic richness (Micro-Ar). A strong and significant relationship is observed among all population estimates of MHC-Ar and Micro-Ar (solid line, P=0.001, R2=0.41), and an insignificant relationship between MHC-STr and Micro-Ar (P= 0.289, R2=0.01). Open circles denote low predation site, and closed circles denote high predation sites.
 op <- par(mfrow = c(1,2))
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai
-     , xlab = "Microsattelite Allelic Richness", ylab = "MHC Allelic Richness"
+     , xlab = "Number of Unique Microsattelite Alleles", ylab = "MHC Allelic Richness"
      , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
      , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
      )
 legend(x = "topleft", c("High Predation", "Low Predation"), pch = c(21,22)
        , bty = "n", pt.bg = c("red", "blue"), pt.cex = 2, cex = 1.05)
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi
-     , xlab = "Microsattelite Allelic Richness", ylab = "MHC Supertype Richness"
+     , xlab = "Number of Unique Microsattelite Alleles", ylab = "Number of Unique MHC supertypes represented by alleles"
      , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
      , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
      )
 par(op)
 
-
-
 # 
 # Effect size visualiztion (lines 339-345) in ind. models manuscript.
+#allelic richness
+# R2 plot
+plot(model_micro_all_ar_r2)
+
+#supertype richness
+#R2 plot
+plot(model_micro_all_str_r2)
 # 
-# two panel plot of orange/black separate, and by drainage
+# two panel plot of orange/black separate, and by drainage - multiple palnels with MHC richness, ST richness, etc.
+
 # 
 # Co-intertia plots, Allegra has the scripts done, need to clean up. Two different Co inertia, original and then within class analysis. For now make a figure for both.
 # 
