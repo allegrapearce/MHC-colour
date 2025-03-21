@@ -30,6 +30,7 @@ library(ggplot2)
 library(ggiraphExtra)
 library(corrr)
 library(gtsummary)
+library(gridExtra)
 ```
 
 ### Data Prep
@@ -756,9 +757,11 @@ Kiyoko finally making plots
 #Figure 1: map DONE by Allegra
 
 # Figure 2: Drainage specific relationship between individual parasite load and relative area black.DONE by Allegra (orange in supp materials)
+
+op <- par(mfrow = c(1,2))
 #ggplot black
- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
-  ggplot(aes(x = x, y = predicted, group = group)) +
+bplot <- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group), show.legend = F) +
   geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
   geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
   geom_jitter(inherit.aes = FALSE,
@@ -767,10 +770,32 @@ Kiyoko finally making plots
              width = 0.1, height = 0.0,
              alpha = 0.5) +
   xlab("Individual Parasite Load") +
-  ylab("Relative Area Black")
+  ylab("Relative Area Black") +
+  theme(legend.position = "none")
+
+#ggplot orange
+oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_jitter(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Tparasites, y = Black, colour = Drainage),
+             width = 0.1, height = 0.0,
+             alpha = 0.5) +
+   
+  xlab("Individual Parasite Load") +
+  ylab("Relative Area Orange")
+
+# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/ColourParasite 2025-03-21.jpeg", width = 12, height = 8, units = "in", quality = 75, bg = "white", res = 300)
+grid.arrange(bplot, oplot, ncol=2)
+# dev.off()
+
 
 # Figure S5 in Jackie’s stuff, remake, and include in main manuscript. Two panels, MicroAR on Y axis, one plot with MHC Ar, and one with MHC STr. different symbols for predation.
 # Figure S5. Linear models showing the relationship between MHC population allelic richness (MHC-Ar; black circles), supertype richness (MHC-STr; red circles), and microsatellite population allelic richness (Micro-Ar). A strong and significant relationship is observed among all population estimates of MHC-Ar and Micro-Ar (solid line, P=0.001, R2=0.41), and an insignificant relationship between MHC-STr and Micro-Ar (P= 0.289, R2=0.01). Open circles denote low predation site, and closed circles denote high predation sites.
+
+# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/MS Alleles MHC 2025-03-21.jpeg", width = 12, height = 8, units = "in", quality = 75, bg = "white", res = 300)
 op <- par(mfrow = c(1,2))
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai
      , xlab = "Number of Unique Microsattelite Alleles", ylab = "MHC Allelic Richness"
@@ -785,6 +810,7 @@ plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi
      , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
      )
 par(op)
+# dev.off()
 
 # 
 # Effect size visualiztion (lines 339-345) in ind. models manuscript.
@@ -797,6 +823,18 @@ plot(model_micro_all_ar_r2)
 plot(model_micro_all_str_r2)
 # 
 # two panel plot of orange/black separate, and by drainage - multiple palnels with MHC richness, ST richness, etc.
+
+# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/Non Effect Colour 2025-03-21.jpeg", width = 12, height = 8, units = "in", quality = 75, bg = "white", res = 300)
+op <- par(mfrow = c(1,2))
+#orange colours
+plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mean_o
+     , xlab = "Number of Unique Microsattelite Alleles", ylab = "Relative Orange Area"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
+     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     )
+par(op)
+# dev.off()
+
 
 # 
 # Co-intertia plots, Allegra has the scripts done, need to clean up. Two different Co inertia, original and then within class analysis. For now make a figure for both.
