@@ -824,11 +824,26 @@ plot(model_micro_all_str_r2)
 # 
 # two panel plot of orange/black separate, and by drainage - multiple palnels with MHC richness, ST richness, etc.
 
-# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/Non Effect Colour 2025-03-21.jpeg", width = 12, height = 8, units = "in", quality = 75, bg = "white", res = 300)
-op <- par(mfrow = c(1,2))
+# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/Non Effect Colour 2025-04-02.jpeg", width = 12, height = 12, units = "in", quality = 75, bg = "white", res = 300)
+op <- par(mfrow = c(2,2))
 #orange colours
-plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mean_o
-     , xlab = "Number of Unique Microsattelite Alleles", ylab = "Relative Orange Area"
+plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_o
+     , xlab = "Number of unique supertypes", ylab = "Relative Orange Area"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
+     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     )
+plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_b
+     , xlab = "Number of unique supertypes", ylab = "Relative Black Area"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
+     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     )
+plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_o
+     , xlab = "Allelic Richness", ylab = "Relative Orange Area"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
+     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     )
+plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_b
+     , xlab = "Number of Unique Microsattelite Alleles", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
      , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
      )
@@ -839,7 +854,7 @@ par(op)
 # 
 # Co-intertia plots, Allegra has the scripts done, need to clean up. Two different Co inertia, original and then within class analysis. For now make a figure for both.
 # 
-# Supplemental materials, multi panel with insignificant stuff for colour.
+
 # 
 # S6 to S8 can be deleted. Redoing S1 map, Allegra has landmarks, keeping S2-S4, remake S5 (move to main manuscript)
 ```
