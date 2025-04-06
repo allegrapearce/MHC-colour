@@ -171,7 +171,7 @@ mhc_r_matrix_pop <- PopDF_parasites %>%
   select(mhc_Ai, mhc_STi)
 ```
 
-#### Co-inertia analyses
+### Co-inertia analyses
 
 **COIA(1)**
 
@@ -370,11 +370,10 @@ cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST11, method = "pearson")
 ```
 
 
-#### individual level mixed models
+### individual level mixed models
 
 Linear mixed models that control for both predation and drainage
 
-Edit axes so they go to the maximum predicted values by increments of 1 (12, that's the highest parasite load)
 ```{r individual level models colour}
 library(gtsummary)
 data_analysis_parasites <- data_analysis %>% 
@@ -427,7 +426,7 @@ data.frame(ggeffects::ggpredict(model_para, terms = c("Ai", "Predation"))) %>%
 ```
 
 
-#### Linear models for population level
+### Linear models for population level
 
 Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level.Using a mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site), however conclusions are the same across both so will report with complete dataset in manuscript. 
 
@@ -579,7 +578,7 @@ grid.arrange(bplot, oplot, ncol=2)
 # dev.off()
 
 
-#triangles for high predation (17), coloured by drainage similar to map
+#triangles for low predation (17), coloured by drainage similar to map
 drainage_colours <- c(  "Caroni" = "#ed3e3e", 
   "North Slope" = "#425ced",
   "Oropuche" = "#edd442",
@@ -592,13 +591,13 @@ drainage_colours <- c(  "Caroni" = "#ed3e3e",
 op <- par(mfrow = c(1,2))
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai
      , xlab = "Number of Unique Microsattelite Alleles", ylab = "MHC Allelic Richness"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19)
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17)
      , cex = 2
      , col = drainage_colours
      )
 legend(x = "topleft"
        , c("High Predation", "Low Predation")
-       , pch = c(17,19)
+       , pch = c(19,17)
        , bty = "n"
        , pt.bg = c("black"), pt.cex = 2, cex = 1.05)
 legend(x = "left"
@@ -611,7 +610,7 @@ legend(x = "left"
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi
      , xlab = "Number of Unique Microsattelite Alleles"
      , ylab = "Number of Unique MHC supertypes represented by alleles"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19)
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17)
      , cex = 2
      , col = drainage_colours
      )
@@ -635,22 +634,22 @@ op <- par(mfrow = c(2,2))
 #orange colours
 plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_o
      , xlab = "Number of unique supertypes", ylab = "Relative Orange Area"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19), cex = 2
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
 plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_b
      , xlab = "Number of unique supertypes", ylab = "Relative Black Area"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19), cex = 2
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
 plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_o
      , xlab = "Allelic Richness", ylab = "Relative Orange Area"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19), cex = 2
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
 plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_b
      , xlab = "Number of Unique Microsattelite Alleles", ylab = "Relative Black Area"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19), cex = 2
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
 par(op)
