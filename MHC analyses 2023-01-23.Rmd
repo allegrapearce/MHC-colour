@@ -537,8 +537,7 @@ Caroni - #ed3e3e
 ```{r manuscript_figures}
 #Figure 1: map DONE by Allegra
 
-# Figure 2: Drainage specific relationship between individual parasite load and relative area black.DONE by Allegra (orange in supp materials)
-
+# Figure 2: Drainage specific relationship between individual parasite load and relative area black and orange.DONE by Allegra
 op <- par(mfrow = c(1,2))
 #ggplot black
 bplot <- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
@@ -573,7 +572,7 @@ oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]",
   xlab("Individual Parasite Load") +
   ylab("Relative Area Orange")
 
-# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/ColourParasite 2025-03-21.jpeg", width = 12, height = 8, units = "in", quality = 75, bg = "white", res = 300)
+# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/ColourParasite 2025-04-06.jpeg", width = 8, height = 4, units = "in", quality = 75, bg = "white", res = 300)
 grid.arrange(bplot, oplot, ncol=2)
 # dev.off()
 
@@ -584,23 +583,25 @@ drainage_colours <- c(  "Caroni" = "#ed3e3e",
   "Oropuche" = "#edd442",
   "Oropuche (Caroni Type)" = "#edd442")
 
-# Figure S5 in Jackie’s stuff, remake, and include in main manuscript. Two panels, MicroAR on Y axis, one plot with MHC Ar, and one with MHC STr. different symbols for predation.
-# Figure S5. Linear models showing the relationship between MHC population allelic richness (MHC-Ar; black circles), supertype richness (MHC-STr; red circles), and microsatellite population allelic richness (Micro-Ar). A strong and significant relationship is observed among all population estimates of MHC-Ar and Micro-Ar (solid line, P=0.001, R2=0.41), and an insignificant relationship between MHC-STr and Micro-Ar (P= 0.289, R2=0.01). Open circles denote low predation site, and closed circles denote high predation sites.
-
-# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/MS Alleles MHC 2025-03-21.jpeg", width = 12, height = 8, units = "in", quality = 75, bg = "white", res = 300)
-op <- par(mfrow = c(1,2))
+# Figure 3 Two panels, MicroAR on Y axis, one plot with MHC Ar, and one with MHC STr. different symbols for predation.
+# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/MS Alleles MHC 2025-04-06.jpeg", width = 10, height = 6, units = "in", quality = 75, bg = "white", res = 300)
+op <- par(mfrow = c(1,2)
+          , mar = c(5.1,5.1,4.1,2.1))
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai
      , xlab = "Number of Unique Microsattelite Alleles", ylab = "MHC Allelic Richness"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17)
      , cex = 2
      , col = drainage_colours
+     , xlim = c(6.5,9.0)
      )
-legend(x = "topleft"
+regLine(lm(PopDF_parasites$mhc_Ai ~ PopDF_parasites$`Micro-Ar`), col = "black")
+
+legend(x = 6.5, y = 8
        , c("High Predation", "Low Predation")
        , pch = c(19,17)
        , bty = "n"
        , pt.bg = c("black"), pt.cex = 2, cex = 1.05)
-legend(x = "left"
+legend(x = 6.5, y = 7.5
        , legend = names(drainage_colours)[1:3]
        , col = drainage_colours[1:3]
        , pch = 18
@@ -609,11 +610,13 @@ legend(x = "left"
        , cex = 1.05)
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi
      , xlab = "Number of Unique Microsattelite Alleles"
-     , ylab = "Number of Unique MHC supertypes represented by alleles"
+     , ylab = "Number of Unique MHC \nSupertypes Represented by Alleles"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17)
      , cex = 2
      , col = drainage_colours
+     , xlim = c(6.5,9.0)
      )
+regLine(lm(PopDF_parasites$mhc_STi ~ PopDF_parasites$`Micro-Ar`), col = "black")
 par(op)
 # dev.off()
 
@@ -627,41 +630,51 @@ plot(model_micro_all_ar_r2)
 #R2 plot
 plot(model_micro_all_str_r2)
 # 
-# two panel plot of orange/black separate, and by drainage - multiple palnels with MHC richness, ST richness, etc.
 
-# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/Non Effect Colour 2025-04-02.jpeg", width = 12, height = 12, units = "in", quality = 75, bg = "white", res = 300)
-op <- par(mfrow = c(2,2))
+#Supplemental Figure 3
+# jpeg(filename =  "~/McGill/MHC Guppy Stuff/MHC R Project/MHC-colour/Figures/Non Effect Colour 2025-04-06.jpeg", width = 8, height = 8, units = "in", quality = 75, bg = "white", res = 300)
+op <- par(mfrow = c(2,2)
+          , cex.lab = 1.5)
 #orange colours
 plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_o
      , xlab = "Number of unique supertypes", ylab = "Relative Orange Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
+legend(x = 4.1, y = 0.17
+       , c("High Predation", "Low Predation")
+       , pch = c(19,17)
+       , bty = "n"
+       , pt.bg = c("black"), pt.cex = 2, cex = 1.05)
+legend(x = 4.1, y = 0.15
+       , legend = names(drainage_colours)[1:3]
+       , col = drainage_colours[1:3]
+       , pch = 18
+       , bty = "n"
+       , pt.cex = 2
+       , cex = 1.05)
+regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$mhc_STi), col = "black")
 plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_b
      , xlab = "Number of unique supertypes", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
+regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$mhc_STi), col = "black")
 plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_o
-     , xlab = "Allelic Richness", ylab = "Relative Orange Area"
+     , xlab = "MHC Allelic Richness", ylab = "Relative Orange Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
+regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$mhc_Ai), col = "black")
 plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_b
-     , xlab = "Number of Unique Microsattelite Alleles", ylab = "Relative Black Area"
+     , xlab = "MHC Allelic Richness", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
+regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$mhc_Ai), col = "black")
 par(op)
 # dev.off()
 
-
-# 
-# Co-intertia plots, two different Co inertia, original and then within class analysis. For now make a figure for both.
-# 
-
-# 
-# S6 to S8 can be deleted. Redoing S1 map, Allegra has landmarks, keeping S2-S4, remake S5 (move to main manuscript)
 ```
 
 
