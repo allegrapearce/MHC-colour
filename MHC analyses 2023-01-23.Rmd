@@ -120,51 +120,7 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 ```
 
 
-### *Reviewers Comments*
-
-* They mentioned replicating analyses with both drainages separately so we can confirm trends across drainages   
-  + COIA, added a within-class analysis to assess common pattersn without drainage level variation
-
-* Why use parametric and non-parametric tests?   
-  + by switching to linear models we aren't mixing parametric and non-parametric anymore   
-
-* Adding in the data from the different years too   
-  + We did this, it allowed us to move to individual level analysis   
-  + It's all 2010 for colour stuff, 2009 included in MHC classification work
-
-* Changing to Individual level analyses to leverage the new data   
-  + COIA (DONE but peesent population level, added a within class analysis)
-  + Wilcoxon - change to models with individual data (DONE)   
-  + Microsatellite - keep at pop level (DONE, do we need the fixed factors?)
-
-### Analysis To Do: 
-
-###### Original Analysis   
-* COIA (In Progress)   
-  + prepare all 3 datasets (DONE)   
-  + Run PCAs (DONE)   
-  + bootstrapping for COIA to test significance (DONE)   
-  + pearson's correlation coefficient test (maybe???) *I am not sure about this*   
-  + Visualization (DONE)   
-* richness linear models (micro-Ar as independent, Ai and STi as dependent) (DONE)   
-* Wilcoxon rank-sum test on all variables by predation level (DONE)   
-* Wilcoxon rank-sum test on all variables by drainage (DONE-Caroni & North)   
-
-###### NEW and IMPROVED Analysis   
-* predation and drainage tests (DONE)   
-  + move to linear mixed models that test for predation and drainage   
-  + use data_analysis df with individual level data   
-* microsatellite linear models   
-  + I added a predation and drainage effect, but I'm not sure if this is right (DONE?) 
-* boxplot and other visualization/figure recreation with individual data   
-* COIA per drainage
-  + Within-class analysis
-* Zombie Plot 1 - Turure is not with a symbol (need to also run analyses with and without Turure)
-
-
 #### Co-inertia analyses
-
-For coinertia analysis the row weighting must be matched between the two dudi (duality diagrams), so for each pca the rows must indicate the same samples. Using only fish we have both genetic data and patternize colour data for we have N = 193.
 
 currently has turure 2 which was originally a caroni introduction (turure 3 was too but has no parsites)
 ```{r data prep}
@@ -261,7 +217,7 @@ plot(coin_2)
 
 "Within-class analyses take into account a partition of individuals into groups and focus on structures which are common to all groups." Dray & Dufour, 2007
 
-I'm pretty sure this is the way to anlayze this data and account for drainage differences, but we lose our significant (but weak) covariation. So basically correlations between colour and parasite load are explained by drainage level processes
+Anlayze this data and account for drainage differences, covariation is no longer significant. Correlations between colour and parasite load are likely explained by drainage level processes
 ```{r within group}
 #doing a within group analysis for drainage level, this only looks at common processes across groups?
 
@@ -416,7 +372,7 @@ cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST11, method = "pearson")
 
 #### individual level mixed models
 
-Move to linear mixed models that control for both predation and drainage, these are replacements for the wilcoxon but with some more thought into model structure and questions
+Linear mixed models that control for both predation and drainage
 
 Edit axes so they go to the maximum predicted values by increments of 1 (12, that's the highest parasite load)
 ```{r individual level, include=FALSE, eval=FALSE}
@@ -652,107 +608,22 @@ g10 <- plot(coin_2)
 ```
 
 
+Note: drainage specific hex values for figures
+Fill (map) (too light for figure): 
+Northern - #b9c1ef
+Oropouche - #f0e8bb
+Caroni - #eecdcd
 
-### Remaking of figures from manuscript
-```{r ZombieFig1}
-#Zombie Figure 1
-#colour metric: relative area Orange
-boxplot(Orange ~ Predation, data = MHCDF)
-boxplot(Orange ~ drainage, data = MHCDF)
-boxplot(Orange ~ Predation * drainage, data = MHCDF)
+Fill (figures):
+Northern - #8292ed
+Oropouche - #ebdb81
+Caroni - #ed8a8a
 
-#black ?
-boxplot(Black ~ Predation, data = MHCDF)
-boxplot(Black ~ drainage, data = MHCDF)
-boxplot(Black ~ Predation * drainage, data = MHCDF)
-```
+Lines and points (darker):
+Northern - #425ced
+Oropouche - #edd442
+Caroni - #ed3e3e
 
-
-```{r ZombieFig2}
-#Zombie Figure 2
-#gyrodactylus prevelance vs. colour
-# populations with no gyros have been removed
-#Use PopDF
-tempDF <- droplevels(PopDF[PopDF$`Gyrodactylus prevalence` > 0.001, ])
-plot(x = tempDF$`Gyrodactylus prevalence`, y = tempDF$mean_o
-     , xlab = "Gyrodactylus prevelance", ylab = "Mean Orange"
-     , las = 1
-     , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17))) #double check pch symbols are correct! Once correct, add to rest of plots (if using)
-abline(lm(mean_o ~ `Gyrodactylus prevalence`, data = tempDF))
-#Jackie had yellow, but no idea why, and we didn't collect yellow data, anyways
-legend(x = "topright", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
-       # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
-       , bty = "n", pt.cex = 1.3, cex = 1.05
-       )
-
-plot(x = tempDF$`Gyrodactylus prevalence`, y = tempDF$mean_b
-     , xlab = "Gyrodactylus prevelance", ylab = "Mean Black"
-     , las = 1
-     , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17)))
-abline(lm(mean_b ~ `Gyrodactylus prevalence`, data = tempDF)) 
-legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
-       # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
-       , bty = "n", pt.cex = 1.3, cex = 1.05
-       )
-
-```
-
-
-
-```{r ZombieFig3}
-
-plot(x = tempDF$ST11, y = tempDF$`Gyrodactylus prevalence`
-     , xlab = "ST 11", ylab = "Gyrodactylus prevelance (%)"
-     , las = 1
-     , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17)))
-abline(lm(ST11 ~ `Gyrodactylus prevalence`, data = tempDF)) #not working
-legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
-       # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
-       , bty = "n", pt.cex = 1.3, cex = 1.05
-       )
-```
-
-
-
-```{r ZombieFig4}
-plot(x = tempDF$`MHC-STr`, y = tempDF$`Gyrodactylus prevalence`
-     , xlab = "Population MHC Supertype Richness"
-     , ylab = "Gyrodactylus prevelance (%)"
-     , las = 1
-     , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17)))
-abline(lm(`Gyrodactylus prevalence` ~ `MHC-STr`, data = tempDF))
-legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
-       # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
-       , bty = "n", pt.cex = 1.3, cex = 1.05
-       )
-
-plot(x = tempDF$`MHC-STr`, y = (tempDF$mean_o)
-     , xlab = "Population MHC Supertype Richness"
-     , ylab = "Orange"
-     , las = 1
-     , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17)))
-abline(lm(mean_o ~ `MHC-STr`, data = tempDF)) #not working
-legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
-       # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
-       , bty = "n", pt.cex = 1.3, cex = 1.05
-       )
-
-plot(x = tempDF$`MHC-STr`, y = (tempDF$mean_b)
-     , xlab = "Population MHC Supertype Richness"
-     , ylab = "Black"
-     , las = 1
-     , pch = ifelse(tempDF$Drainage == "Caroni", 16, ifelse(tempDF$Drainage == "North Slope", 15, 17)))
-abline(lm(mean_b ~ `MHC-STr`, data = tempDF)) #not working
-legend(x = "topleft", c("Caroni", "North Slope", "Oropuche"), pch = c(16, 15, 17)
-       # , lty = c(1, 2, 3), merge = TRUE, lwd = 1.8
-       , bty = "n", pt.cex = 1.3, cex = 1.05
-       )
-
-
-rm(tempDF)
-```
-
-Kiyoko finally making plots
 ```{r manuscript_figures}
 #Figure 1: map DONE by Allegra
 
@@ -769,6 +640,8 @@ bplot <- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]",
              aes(x = Tparasites, y = Black, colour = Drainage),
              width = 0.1, height = 0.0,
              alpha = 0.5) +
+  scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
+  scale_fill_manual(values = c("#ed8a8a","#8292ed","#ebdb81")) +
   xlab("Individual Parasite Load") +
   ylab("Relative Area Black") +
   theme(legend.position = "none")
@@ -783,7 +656,8 @@ oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]",
              aes(x = Tparasites, y = Black, colour = Drainage),
              width = 0.1, height = 0.0,
              alpha = 0.5) +
-   
+    scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
+  scale_fill_manual(values = c("#ed8a8a","#8292ed","#ebdb81")) +
   xlab("Individual Parasite Load") +
   ylab("Relative Area Orange")
 
@@ -792,6 +666,12 @@ grid.arrange(bplot, oplot, ncol=2)
 # dev.off()
 
 
+#triangles for high predation (17), coloured by drainage similar to map
+drainage_colours <- c(  "Caroni" = "#ed3e3e", 
+  "North Slope" = "#425ced",
+  "Oropuche" = "#edd442",
+  "Oropuche (Caroni Type)" = "#edd442")
+
 # Figure S5 in Jackie’s stuff, remake, and include in main manuscript. Two panels, MicroAR on Y axis, one plot with MHC Ar, and one with MHC STr. different symbols for predation.
 # Figure S5. Linear models showing the relationship between MHC population allelic richness (MHC-Ar; black circles), supertype richness (MHC-STr; red circles), and microsatellite population allelic richness (Micro-Ar). A strong and significant relationship is observed among all population estimates of MHC-Ar and Micro-Ar (solid line, P=0.001, R2=0.41), and an insignificant relationship between MHC-STr and Micro-Ar (P= 0.289, R2=0.01). Open circles denote low predation site, and closed circles denote high predation sites.
 
@@ -799,15 +679,28 @@ grid.arrange(bplot, oplot, ncol=2)
 op <- par(mfrow = c(1,2))
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai
      , xlab = "Number of Unique Microsattelite Alleles", ylab = "MHC Allelic Richness"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
-     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19)
+     , cex = 2
+     , col = drainage_colours
      )
-legend(x = "topleft", c("High Predation", "Low Predation"), pch = c(21,22)
-       , bty = "n", pt.bg = c("red", "blue"), pt.cex = 2, cex = 1.05)
+legend(x = "topleft"
+       , c("High Predation", "Low Predation")
+       , pch = c(17,19)
+       , bty = "n"
+       , pt.bg = c("black"), pt.cex = 2, cex = 1.05)
+legend(x = "left"
+       , legend = names(drainage_colours)[1:3]
+       , col = drainage_colours[1:3]
+       , pch = 18
+       , bty = "n"
+       , pt.cex = 2
+       , cex = 1.05)
 plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi
-     , xlab = "Number of Unique Microsattelite Alleles", ylab = "Number of Unique MHC supertypes represented by alleles"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
-     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     , xlab = "Number of Unique Microsattelite Alleles"
+     , ylab = "Number of Unique MHC supertypes represented by alleles"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19)
+     , cex = 2
+     , col = drainage_colours
      )
 par(op)
 # dev.off()
@@ -829,30 +722,30 @@ op <- par(mfrow = c(2,2))
 #orange colours
 plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_o
      , xlab = "Number of unique supertypes", ylab = "Relative Orange Area"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
-     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19), cex = 2
+     , col = drainage_colours
      )
 plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_b
      , xlab = "Number of unique supertypes", ylab = "Relative Black Area"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
-     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19), cex = 2
+     , col = drainage_colours
      )
 plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_o
      , xlab = "Allelic Richness", ylab = "Relative Orange Area"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
-     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19), cex = 2
+     , col = drainage_colours
      )
 plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_b
      , xlab = "Number of Unique Microsattelite Alleles", ylab = "Relative Black Area"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 21, 22), cex = 2
-     , bg = ifelse(PopDF_parasites$Predation == "High", "red", "blue")
+     , pch = ifelse(PopDF_parasites$Predation == "High", 17, 19), cex = 2
+     , col = drainage_colours
      )
 par(op)
 # dev.off()
 
 
 # 
-# Co-intertia plots, Allegra has the scripts done, need to clean up. Two different Co inertia, original and then within class analysis. For now make a figure for both.
+# Co-intertia plots, two different Co inertia, original and then within class analysis. For now make a figure for both.
 # 
 
 # 
