@@ -120,8 +120,6 @@ data_analysis <- inner_join(data_analysis, ST_freq, by = "Fish") %>%
 ```
 
 
-#### Co-inertia analyses
-
 currently has turure 2 which was originally a caroni introduction (turure 3 was too but has no parsites)
 ```{r data prep}
 # check for uninfected populations to exclude from analyses between immunity and colour
@@ -172,6 +170,8 @@ mhc_f_matrix_pop <- PopDF_parasites %>%
 mhc_r_matrix_pop <- PopDF_parasites %>% 
   select(mhc_Ai, mhc_STi)
 ```
+
+#### Co-inertia analyses
 
 **COIA(1)**
 
@@ -375,7 +375,7 @@ cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST11, method = "pearson")
 Linear mixed models that control for both predation and drainage
 
 Edit axes so they go to the maximum predicted values by increments of 1 (12, that's the highest parasite load)
-```{r individual level, include=FALSE, eval=FALSE}
+```{r individual level models colour}
 library(gtsummary)
 data_analysis_parasites <- data_analysis %>% 
   filter(!Site %in% no_parasite_sites) %>% 
@@ -394,7 +394,6 @@ summary(model_b)
 #car::Anova(model_o)
 #car::Anova(model_b)
 
-# car anova output only giving p-value not chisq estimate?
 merged_tbl <- tbl_merge(tbls = list(tbl_regression(model_o),tbl_regression(model_b)),tab_spanner = c("**Orange**", "**Black**"))
 
 model_o_r2 <- r2beta(model_o)
@@ -402,39 +401,11 @@ model_b_r2 <- r2beta(model_b)
 plot(model_o_r2)
 plot(model_b_r2)
 
-#visualization
-
-#ggplot orange
- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
-  ggplot(aes(x = x, y = predicted, group = group)) +
-  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
-  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
-  geom_jitter(inherit.aes = FALSE,
-             data = data_analysis_parasites,
-             aes(x = Tparasites, y = Orange, colour = Drainage),
-             width = 0.1, height = 0.0,
-             alpha = 0.5) +
-  xlab("Individual Parasite Load") +
-  ylab("Relative Area Orange")
- 
-#ggplot black
- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
-  ggplot(aes(x = x, y = predicted, group = group)) +
-  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
-  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
-  geom_jitter(inherit.aes = FALSE,
-             data = data_analysis_parasites,
-             aes(x = Tparasites, y = Black, colour = Drainage),
-             width = 0.1, height = 0.0,
-             alpha = 0.5) +
-  xlab("Individual Parasite Load") +
-  ylab("Relative Area Black")
-
 ```
 
 
-individual level no colour
-```{r parasite mm}
+individual level parasite model, no colour.
+```{r individual models parasites}
 model_para <- glmer(Tparasites ~ Ai + STi + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "poisson")
 
 summary(model_para)
@@ -442,7 +413,7 @@ summary(model_para)
 
 tbl_regression(model_para, exponentiate = TRUE)
 
-#visualization, could use jitter to make clearer
+#visualization, not in MS
 data.frame(ggeffects::ggpredict(model_para, terms = c("Ai", "Predation"))) %>% 
   ggplot(aes(x = x, y = predicted, group = group)) +
   geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
@@ -458,10 +429,11 @@ data.frame(ggeffects::ggpredict(model_para, terms = c("Ai", "Predation"))) %>%
 
 #### Linear models for population level
 
-Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level.Using a mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site). 
+Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level.Using a mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site), however conclusions are the same across both so will report with complete dataset in manuscript. 
 
-```{r microsat mixed model}
-#Predation regime may contribute variance but only has two levels and will be added as a fixed factor
+Effect size plots are in plots section.
+
+```{r microsat mixed model no turure, eval=FALSE}
 model_micro_ar <- lmer(`MHC-Ar` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
 
 #check_model(model_micro_ar)
@@ -471,8 +443,12 @@ model_micro_str <- lmer(`MHC-STr` ~ `Micro-Ar` + Predation + (1|Drainage), data 
 
 #check_model(model_micro_str)
 summary(model_micro_str)
+```
 
-#run with and without turure (since it's an introduction), conclusions are the same so use that (larger sample size)
+
+```{r microsat mixed model}
+#Predation regime may contribute variance but only has two levels and will be added as a fixed factor
+
 model_micro_all_ar <- lmer(`MHC-Ar` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF)
 
 #check_model(model_micro_all_ar)
@@ -486,17 +462,13 @@ summary(model_micro_all_str)
 merged_tbl2 <- tbl_merge(tbls = list(tbl_regression(model_micro_all_str),tbl_regression(model_micro_all_ar)),
                         tab_spanner = c("**ST Richness**", "**Allelic Richness**"))
 
-#effect size
-
+#effect size, plots are in plots section
 model_micro_all_ar_r2 <- r2beta(model_micro_all_ar) #marginal r2
 model_micro_all_str_r2 <- r2beta(model_micro_all_str) #marginal r2
 ```
 
-Making these for reference, Manuscript has a summary table with both results (Merged_tbl2) and I think that's sufficient.
-```{r microsat mixed model plots}
-#allelic richness
-# R2 plot
-plot(model_micro_all_ar_r2)
+Making other plots for reference. Manuscript has a summary table with both results (Merged_tbl2) and I think that's sufficient.
+```{r microsat mixed model plots not in MS, eval=FALSE}
 
 #model plot
 data.frame(ggeffects::ggpredict(model_micro_all_ar, terms = c("Micro-Ar", "Predation"))) %>% 
@@ -510,9 +482,7 @@ data.frame(ggeffects::ggpredict(model_micro_all_ar, terms = c("Micro-Ar", "Preda
   xlab("Microsatellite Richness") +
   ylab("MHC Allelic Richness")
 
-#supertype richness
-#R2 plot
-plot(model_micro_all_str_r2)
+
 
 data.frame(ggeffects::ggpredict(model_micro_all_str, terms = c("Micro-Ar", "Predation"))) %>% 
   ggplot(aes(x = x, y = predicted, group = group)) +
@@ -528,67 +498,8 @@ data.frame(ggeffects::ggpredict(model_micro_all_str, terms = c("Micro-Ar", "Pred
 ```
 
 
-Population level colour models, with prevalence
-
-There's just too few data points to do mixed models at this level I think.
-```{r pop mm}
-
-model_pop_o <- lm(mean_o ~ prevalence + mhc_Ai + mhc_STi + Predation, data = PopDF_parasites) 
-
-model_pop_b <- lm(mean_b ~ prevalence + mhc_Ai + mhc_STi + Predation, data = PopDF_parasites) 
-
-#check_model(model_pop_o) 
-#check_model(model_pop_b)
-
-summary(model_pop_o)
-summary(model_pop_b)
-
-#visualization
-#ggplot orange
- data.frame(ggeffects::ggpredict(model_pop_o, terms = c("mhc_Ai"))) %>% 
-  ggplot(aes(x = x, y = predicted)) +
-  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error),fill = "orange", alpha = 0.35) +
-  geom_line(aes(x = x, y = predicted), colour = "orange") +
-  geom_point(inherit.aes = FALSE,
-             data = PopDF_parasites,
-             aes(x = mhc_Ai, y = mean_o),
-             alpha = 0.5, colour = "orange") +
-  xlab("MHC Allelic Richness") +
-  ylab("Average Relative Area Orange")
- 
-#ggplot black
- data.frame(ggeffects::ggpredict(model_pop_b, terms = c("mhc_Ai"))) %>% 
-  ggplot(aes(x = x, y = predicted)) +
-  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error), alpha = 0.35) +
-  geom_line(aes(x = x, y = predicted)) +
-  geom_point(inherit.aes = FALSE,
-             data = PopDF_parasites,
-             aes(x = mhc_Ai, y = mean_b),
-             alpha = 0.5) +
-  xlab("MHC Allelic Richness") +
-  ylab("Average Relative Area Black")
-```
-
-
-```{r prevalence model}
-model_para_pop <- lmer(prevalence ~ mhc_Ai + mhc_STi + Predation + (1|Drainage), data = PopDF_parasites)
-
-#check_model(model_para_pop)
-
-summary(model_para_pop)
-```
-
-
-
 ### Figures
 
-- COIA plots
-- Boxplots similar to original paper
-- Visualizations of correlations to investigate more thoroughly
-- whatever else we want
-
-The coin visualization is a work in progress...   
-We will need to recreate the plots in the original paper to make sure they all match our data and so we can provide the source code.
 ```{r coia plots}
 # coin 1
 g1 <- s.arrow(coin_1$l1, plab.cex = 0.7)
