@@ -553,6 +553,7 @@ bplot <- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]",
              alpha = 0.5) +
   scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
   scale_fill_manual(values = c("#ed8a8a","#8292ed","#ebdb81")) +
+  scale_x_continuous(breaks = seq(0, 12, by = 1)) +
   xlab("Individual Parasite Load") +
   ylab("Relative Area Black") +
   theme(legend.position = "none")
@@ -567,8 +568,9 @@ oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]",
              aes(x = Tparasites, y = Black, colour = Drainage),
              width = 0.1, height = 0.0,
              alpha = 0.5) +
-    scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
+  scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
   scale_fill_manual(values = c("#ed8a8a","#8292ed","#ebdb81")) +
+  scale_x_continuous(breaks = seq(0, 12, by = 1)) +
   xlab("Individual Parasite Load") +
   ylab("Relative Area Orange")
 
