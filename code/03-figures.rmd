@@ -1,0 +1,318 @@
+---
+title: "03-figures"
+author: "Allegra Love"
+date: "2025-09-27"
+output: html_document
+---
+
+
+```{r setup include = FALSE}
+library(car)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(tidyverse)
+```
+
+
+### Figures
+
+Note: drainage specific hex values for figures
+Fill (map) (too light for figure): 
+Northern - #b9c1ef
+Oropouche - #f0e8bb
+Caroni - #eecdcd
+
+Fill (figures):
+Northern - #8292ed
+Oropouche - #ebdb81
+Caroni - #ed8a8a
+
+Lines and points (darker):
+Northern - #425ced
+Oropouche - #edd442
+Caroni - #ed3e3e
+
+Figure 1 was generated in QGIS
+
+### Figure 2: Drainage specific relationship between individual parasite load and relative area black and orange.
+```{r fig 2 data include = FALSE}
+load("../output/fig2.RData")
+#function to sahre a legend between a multi-plot arrangement (from: https://cran.r-project.org/web/packages/egg/vignettes/Ecosystem.html)
+grid_arrange_shared_legend <-
+  function(...,
+           ncol = length(list(...)),
+           nrow = 1,
+           position = c("bottom", "right")) {
+    
+    plots <- list(...)
+    position <- match.arg(position)
+    g <-
+      ggplotGrob(plots[[1]] + theme(legend.position = position))$grobs
+    legend <- g[[which(sapply(g, function(x)
+      x$name) == "guide-box")]]
+    lheight <- sum(legend$height)
+    lwidth <- sum(legend$width)
+    gl <- lapply(plots, function(x)
+      x + theme(legend.position = "none"))
+    gl <- c(gl, ncol = ncol, nrow = nrow)
+    
+    combined <- switch(
+      position,
+      "bottom" = arrangeGrob(
+        do.call(arrangeGrob, gl),
+        legend,
+        ncol = 1,
+        heights = unit.c(unit(1, "npc") - lheight, lheight)
+      ),
+      "right" = arrangeGrob(
+        do.call(arrangeGrob, gl),
+        legend,
+        ncol = 2,
+        widths = unit.c(unit(1, "npc") - lwidth, lwidth)
+      )
+    )
+    
+    grid.newpage()
+    grid.draw(combined)
+    
+    # return gtable invisibly
+    invisible(combined)
+    
+  }
+```
+
+
+```{r Fig 2}
+#ggplot black
+bplot <- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group), show.legend = F) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_jitter(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Tparasites, y = Black, colour = Drainage),
+             width = 0.1, height = 0.0,
+             alpha = 0.5) +
+  scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
+  scale_fill_manual(values = c("#ed8a8a","#8292ed","#ebdb81")) +
+  scale_x_continuous(breaks = seq(0, 12, by = 1)) +
+  xlab("Individual Parasite Load") +
+  ylab("Relative Area Black") +
+  labs(colour = "Drainage", fill = "Drainage") +
+  theme_classic() +
+  theme(legend.position = "none")
+
+#ggplot orange
+oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_jitter(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Tparasites, y = Black, colour = Drainage),
+             width = 0.1, height = 0.0,
+             alpha = 0.5) +
+  scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
+  scale_fill_manual(values = c("#ed8a8a","#8292ed","#ebdb81")) +
+  scale_x_continuous(breaks = seq(0, 12, by = 1)) +
+  xlab("Individual Parasite Load") +
+  ylab("Relative Area Orange") +
+  labs(colour = "Drainage", fill = "Drainage") +
+  theme_classic() +
+  theme(legend.position = "bottom")
+
+
+jpeg(filename =  "../Figures/ColourParasite 2025-04-06.jpeg", width = 8, height = 4, units = "in", quality = 75, bg = "white", res = 300)
+
+grid_arrange_shared_legend(bplot, oplot)
+dev.off()
+
+```
+
+
+### Figure 3 Two panels, MicroAR on Y axis, one plot with MHC Ar, and one with MHC STr. different symbols for predation.
+```{r fig 3 data include = FALSE}
+load("../output/fig3.Rdata")
+```
+
+
+```{r Fig 3}
+#triangles for low predation (17), coloured by drainage similar to map
+drainage_colours <- c(  "Caroni" = "#ed3e3e", 
+  "North Slope" = "#425ced",
+  "Oropuche" = "#edd442",
+  "Oropuche (Caroni Type)" = "#edd442")
+
+# jpeg(filename =  "../Figures/MS Alleles MHC 2025-04-06.jpeg", width = 10, height = 6, units = "in", quality = 75, bg = "white", res = 300)
+op <- par(mfrow = c(1,2)
+          , mar = c(5.1,5.1,4.1,2.1))
+plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai
+     , xlab = "Number of Unique Microsattelite Alleles", ylab = "MHC Allelic Richness"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17)
+     , cex = 2
+     , col = drainage_colours
+     , xlim = c(6.5,9.0)
+     )
+regLine(lm(PopDF_parasites$mhc_Ai ~ PopDF_parasites$`Micro-Ar`), col = "black")
+
+legend(x = 6.5, y = 8
+       , c("High Predation", "Low Predation")
+       , pch = c(19,17)
+       , bty = "n"
+       , pt.bg = c("black"), pt.cex = 2, cex = 1.05)
+legend(x = 6.5, y = 7.5
+       , legend = names(drainage_colours)[1:3]
+       , col = drainage_colours[1:3]
+       , pch = 18
+       , bty = "n"
+       , pt.cex = 2
+       , cex = 1.05)
+plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi
+     , xlab = "Number of Unique Microsattelite Alleles"
+     , ylab = "Number of Unique MHC \nSupertypes Represented by Alleles"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17)
+     , cex = 2
+     , col = drainage_colours
+     , xlim = c(6.5,9.0)
+     )
+regLine(lm(PopDF_parasites$mhc_STi ~ PopDF_parasites$`Micro-Ar`), col = "black")
+par(op)
+# dev.off()
+```
+
+### Microsat figures
+
+```{r microsat fig data include = FALSE}
+load("../output/microsat_figs.RData")
+```
+
+Effect size visualiztion (lines 339-345) in ind. models manuscript.
+```{r effect size visualization}
+#allelic richness
+# R2 plot
+plot(model_micro_all_ar_r2)
+
+#supertype richness
+#R2 plot
+plot(model_micro_all_str_r2)
+#
+```
+
+
+Making other plots for reference. Manuscript has a summary table with both results (Merged_tbl2).
+```{r microsat mixed model plots not in MS, eval=FALSE}
+
+#model plot
+data.frame(ggeffects::ggpredict(model_micro_all_ar, terms = c("Micro-Ar", "Predation"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_point(inherit.aes = FALSE,
+             data = PopDF,
+             aes(y = `MHC-Ar`, x = `Micro-Ar`, colour = Predation),
+             alpha = 0.5) +
+  xlab("Microsatellite Richness") +
+  ylab("MHC Allelic Richness")
+
+
+
+data.frame(ggeffects::ggpredict(model_micro_all_str, terms = c("Micro-Ar", "Predation"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_point(inherit.aes = FALSE,
+             data = PopDF,
+             aes(y = `MHC-STr`, x = `Micro-Ar`, colour = Predation),
+             alpha = 0.5) +
+  xlab("Microsatellite Richness") +
+  ylab("MHC Supertype Richness")
+
+```
+
+### Supplemental Figure 3
+
+```{r Supp fig 3}
+#Supplemental Figure 3
+# jpeg(filename =  "../Figures/Non Effect Colour 2025-04-06.jpeg", width = 8, height = 8, units = "in", quality = 75, bg = "white", res = 300)
+op <- par(mfrow = c(2,2)
+          , cex.lab = 1.5)
+#orange colours
+plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_o
+     , xlab = "Number of unique supertypes", ylab = "Relative Orange Area"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
+     , col = drainage_colours
+     )
+legend(x = 4.1, y = 0.17
+       , c("High Predation", "Low Predation")
+       , pch = c(19,17)
+       , bty = "n"
+       , pt.bg = c("black"), pt.cex = 2, cex = 1.05)
+legend(x = 4.1, y = 0.15
+       , legend = names(drainage_colours)[1:3]
+       , col = drainage_colours[1:3]
+       , pch = 18
+       , bty = "n"
+       , pt.cex = 2
+       , cex = 1.05)
+regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$mhc_STi), col = "black")
+plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_b
+     , xlab = "Number of unique supertypes", ylab = "Relative Black Area"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
+     , col = drainage_colours
+     )
+regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$mhc_STi), col = "black")
+plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_o
+     , xlab = "MHC Allelic Richness", ylab = "Relative Orange Area"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
+     , col = drainage_colours
+     )
+regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$mhc_Ai), col = "black")
+plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_b
+     , xlab = "MHC Allelic Richness", ylab = "Relative Black Area"
+     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
+     , col = drainage_colours
+     )
+regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$mhc_Ai), col = "black")
+par(op)
+# dev.off()
+
+```
+
+### Coinertia Supplemental Figures
+
+```{r coia fig data include = FALSE}
+load("../output/coia_supp_figs.RData")
+```
+
+
+```{r Supplemental coia plots}
+# coin 1
+g1 <- ade4::s.arrow(coin_9$l1, label = c("Prevalence", "Orange", "Black"), boxes = TRUE)
+g2 <- ade4::s.arrow(coin_9$c1)
+g3 <- s.corcircle(coin_9$aX)
+g4 <- s.corcircle(coin_9$aY)
+g5 <- plot(coin_9)
+
+svg(file="../Figures/coin1_a.svg",width=4, height=4)
+ade4::s.arrow(coin_9$l1, label = c("Prevalence", "Orange", "Black"), boxes = TRUE)
+dev.off()
+svg(file="../Figures/coin1_b.svg",width=4, height=4)
+ ade4::s.arrow(coin_9$c1)
+dev.off()
+
+
+# coin 2
+g6 <- ade4::s.arrow(coin_10$l1, label = c("Prevalence", "Orange", "Black"), boxes = TRUE)
+g7 <- ade4::s.arrow(coin_10$c1)
+g10 <- plot(coin_2)
+
+svg(file="../Figures/coin2_a.svg",
+width=4, height=4)
+ade4::s.arrow(coin_10$l1, label = c("Prevalence", "Orange", "Black"), boxes = TRUE)
+dev.off()
+svg(file="../Figures/coin2_b.svg",
+width=4, height=4)
+ ade4::s.arrow(coin_10$c1)
+dev.off()
+```

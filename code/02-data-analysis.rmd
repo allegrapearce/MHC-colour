@@ -1,0 +1,318 @@
+---
+title: "02-data-analysis"
+author: "Allegra Love"
+date: "2025-09-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(gtsummary)
+library(ade4)
+library(corrr)
+library(lme4)
+library(r2glmm)
+```
+
+### 1. Co-inertia analyses
+
+```{r coia data include = FALSE}
+load("../output/analysis_1.RData")
+```
+
+
+**COIA(1)**
+
+    Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
+    Data matrix (2) contained MHC-ST frequencies for each population
+
+**COIA(2)**
+
+    Data matrix (1) contained colour means and Gyrodactylus prevalence for each population
+    Data matrix (2) contained MHC-Ar, and MHC-STr
+
+Permutation test with 1000 bootstrap replications to test significance of co-variation in COIA
+
+To address variation from drainage I added a within-class analysis at the drainage level.
+
+#### At the individual level...
+
+```{r coia individual level}
+# pcas, currently keeping all factors
+pca_colour <- dudi.pca(colour_matrix, scale = TRUE, scannf = FALSE, nf = 3) # because parasite counts and relative area have different scales
+pca_mhc_f <- dudi.pca(mhc_f_matrix, scale = FALSE, scannf = FALSE, nf = 10) #same scale
+pca_mhc_r <- dudi.pca(mhc_r_matrix, scale = FALSE, scannf = FALSE, nf = 2) #same scale
+
+# for both COIN analyses the screeplot indicates only the first factor is significantly contributing, should we only keep 1?
+
+#COIN 1 - colour and MHC ST frequency
+coin_1 <- coinertia(dudiY = pca_colour, dudiX = pca_mhc_f, scannf = FALSE) #manually put axes to keep
+
+#COIN 2 - colour and allelic richness
+coin_2 <- coinertia(dudiY = pca_colour, dudiX = pca_mhc_r, scannf = FALSE) #manually put axes to keep
+
+#permutation test
+rv1 <- RV.rtest(pca_colour$tab, pca_mhc_f$tab, 1000)
+plot(rv1) # simulated p = 0.001, RV = 0.11
+
+rv2 <- RV.rtest(pca_colour$tab, pca_mhc_r$tab, 1000)
+plot(rv2) # simulated p = 0.374, RV = 0.014
+
+plot(coin_1)
+plot(coin_2)
+```
+
+
+"Within-class analyses take into account a partition of individuals into groups and focus on structures which are common to all groups." Dray & Dufour, 2007
+
+Analyze this data and account for drainage differences, covariation is no longer significant. Correlations between colour and parasite load are likely explained by drainage level processes
+```{r within group}
+#doing a within group analysis for drainage level, this only looks at common processes across groups?
+
+wca_colour <- wca(pca_colour, fac = data_matrices$Drainage, scannf = FALSE)
+wca_mhc_f <- wca(pca_mhc_f, fac = data_matrices$Drainage, scannf = FALSE) 
+
+plot(wca_mhc_f)
+plot(wca_colour)
+
+coin_3 <- coinertia(dudiY = wca_colour, dudiX = wca_mhc_f, scannf = FALSE)
+plot(coin_3)
+
+#permutation test
+rv3 <- RV.rtest(wca_colour$tab, wca_mhc_f$tab, 1000)
+plot(rv3) # p-value = 0.26, rv = 0.035
+
+#with site? Same interpretation
+wca_colour_2 <- wca(pca_colour, fac = data_matrices$Site, scannf = FALSE)
+wca_mhc_f_2 <- wca(pca_mhc_f, fac = data_matrices$Site, scannf = FALSE) 
+
+plot(wca_mhc_f_2)
+plot(wca_colour_2)
+
+coin_4 <- coinertia(dudiY = wca_colour_2, dudiX = wca_mhc_f_2, scannf = FALSE)
+plot(coin_4) #saved as coia_plot_2.png, 590 x 640
+
+#permutation test
+rv4 <- RV.rtest(wca_colour_2$tab, wca_mhc_f_2$tab, 1000)
+plot(rv4) # rv = 0.023, p-value = 0.69
+
+
+#for the other coia (2)
+wca_mhc_r <- wca(pca_mhc_r, fac = data_matrices$Drainage, scannf = FALSE) 
+
+plot(wca_mhc_r)
+plot(wca_colour)
+
+coin_6 <- coinertia(dudiY = wca_colour, dudiX = wca_mhc_r, scannf = FALSE)
+plot(coin_6) #saved as coia_plot_2.png, 590 x 640
+
+#permutation test
+rv6 <- RV.rtest(wca_colour$tab, wca_mhc_r$tab, 1000)
+
+plot(rv6) # rv = 0.61, p-value = 0.66
+```
+
+#### At the population level...
+
+Confirmed that the same trend exists at the population level (prevalence), significant relationship when not using the within class analysis
+```{r coia population level}
+# pcas, currently keeping all factors
+pca_colour_p <- dudi.pca(colour_matrix_pop, scale = TRUE, scannf = FALSE) # because parasite counts and relative area have different scales
+pca_mhc_f_p <- dudi.pca(mhc_f_matrix_pop, scale = FALSE, scannf = FALSE)
+pca_mhc_r_p <- dudi.pca(mhc_r_matrix_pop, scale = FALSE, scannf = FALSE) 
+
+#COIN 1 - colour and MHC ST frequency
+coin_7 <- coinertia(dudiY = pca_colour_p, dudiX = pca_mhc_f_p, scannf = FALSE)
+
+#COIN 2 - colour and allelic richness
+coin_8 <- coinertia(dudiY = pca_colour_p, dudiX = pca_mhc_r_p, scannf = FALSE) 
+
+#permutation test
+rv7 <- RV.rtest(pca_colour_p$tab, pca_mhc_f_p$tab, 1000)
+plot(rv7) # simulated p = 0.05, RV = 0.386
+
+rv8 <- RV.rtest(pca_colour_p$tab, pca_mhc_r_p$tab, 1000)
+plot(rv8) # simulated p = 0.002, RV = 0.564
+
+
+## WITHIN CLASS
+wca_colour_p <- wca(pca_colour_p, fac = PopDF_parasites$Drainage_simple, scannf = FALSE)
+wca_mhc_f_p <- wca(pca_mhc_f_p, fac = PopDF_parasites$Drainage_simple, scannf = FALSE) 
+wca_mhc_r_p <- wca(pca_mhc_r_p, fac = PopDF_parasites$Drainage_simple, scannf = FALSE) 
+
+plot(wca_mhc_f_p)
+plot(wca_mhc_r_p)
+plot(wca_colour_p)
+
+coin_9 <- coinertia(dudiY = wca_colour_p, dudiX = wca_mhc_f_p, scannf = FALSE)
+plot(coin_9)
+
+coin_10 <- coinertia(dudiY = wca_colour_p, dudiX = wca_mhc_r_p, scannf = FALSE)
+plot(coin_10)
+
+#permutation test
+rv9 <- RV.rtest(wca_colour_p$tab, wca_mhc_f_p$tab, 1000)
+plot(rv9) # p-value = 0.24, rv = 0.26
+rv10 <- RV.rtest(wca_colour_p$tab, wca_mhc_r_p$tab, 1000)
+plot(rv10) # p-value = 0.065, rv = 0.30
+```
+
+#### Pearson's Correlations on key interactions at population level
+```{r PCC}
+#correlation plot
+PopDF_parasites %>% 
+  correlate() %>% 
+  focus(prevalence)
+
+
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST1, method = "pearson")
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST2, method = "pearson") #sig
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST3, method = "pearson")
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST4, method = "pearson") 
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST5, method = "pearson")
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST6, method = "pearson")
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST7, method = "pearson")
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST8, method = "pearson")
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST9, method = "pearson")
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST10, method = "pearson") #sig
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST11, method = "pearson") #sig
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$mean_o, method = "pearson") # strong but insig p = 0.09
+
+PopDF_parasites %>% 
+  correlate() %>% 
+  focus(mean_o)
+
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$mhc_STi, method = "pearson") #sig
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$mhc_Ai, method = "pearson") #sig
+
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$mhc_STi, method = "pearson") #sig
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$mhc_Ai, method = "pearson") #sig
+
+#of the ST none correlated with orange
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST1, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST2, method = "pearson") 
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST3, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST4, method = "pearson") 
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST5, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST6, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST7, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST8, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST9, method = "pearson")
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST10, method = "pearson") 
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST11, method = "pearson") 
+
+```
+
+
+### 2. individual level mixed models
+
+Linear mixed models that control for both predation and drainage
+
+```{r indiv lmms data include = FALSE}
+load("../output/analysis_2.RData")
+```
+
+
+```{r individual level models colour}
+model_o <- lmer(Orange ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #north drainage and low pred almost sig
+model_b <- lmer(Black ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #oropouche drainage sig
+
+#check_model(model_o)
+#check_model(model_b)
+
+#currently presenting summary statistics in text
+summary(model_o)
+summary(model_b)
+#car::Anova(model_o)
+#car::Anova(model_b)
+
+merged_tbl <- tbl_merge(tbls = list(tbl_regression(model_o),tbl_regression(model_b)),tab_spanner = c("**Orange**", "**Black**"))
+
+model_o_r2 <- r2beta(model_o)
+model_b_r2 <- r2beta(model_b)
+plot(model_o_r2)
+plot(model_b_r2)
+
+```
+
+
+individual level parasite model, no colour.
+```{r individual models parasites}
+model_para <- glmer(Tparasites ~ Ai + STi + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "poisson")
+
+summary(model_para)
+#car::Anova(model_para)
+
+tbl_regression(model_para, exponentiate = TRUE)
+
+#visualization, not in MS
+data.frame(ggeffects::ggpredict(model_para, terms = c("Ai", "Predation"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
+  geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
+  geom_point(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Ai, y = Tparasites, colour = Predation),
+             alpha = 0.5) +
+  xlab("MHC Allelic Richness") +
+  ylab("Individual Parasite Intensity")
+```
+
+
+### 3. Linear models for population level
+
+Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level. Using a mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site), however conclusions are the same across both so will report with complete dataset in manuscript. 
+
+```{r pop lmms data include = FALSE}
+load("../output/analysis_3.RData")
+```
+
+
+```{r microsat mixed model no turure, eval=FALSE}
+model_micro_ar <- lmer(`MHC-Ar` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+
+#check_model(model_micro_ar)
+summary(model_micro_ar)
+
+model_micro_str <- lmer(`MHC-STr` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+
+#check_model(model_micro_str)
+summary(model_micro_str)
+```
+
+
+```{r microsat mixed model}
+#Predation regime may contribute variance but only has two levels and will be added as a fixed factor
+
+model_micro_all_ar <- lmer(`MHC-Ar` ~ `Micro-Ar` + Predation + (1|Drainage), data = pop_level_dat)
+
+#check_model(model_micro_all_ar)
+summary(model_micro_all_ar)
+
+model_micro_all_str <- lmer(`MHC-STr` ~ `Micro-Ar` + Predation + (1|Drainage), data = pop_level_dat)
+
+#check_model(model_micro_all_str)
+summary(model_micro_all_str)
+
+merged_tbl2 <- tbl_merge(tbls = list(tbl_regression(model_micro_all_str),tbl_regression(model_micro_all_ar)),
+                        tab_spanner = c("**ST Richness**", "**Allelic Richness**"))
+
+#effect size, plots are in plots section
+model_micro_all_ar_r2 <- r2beta(model_micro_all_ar) #marginal r2
+model_micro_all_str_r2 <- r2beta(model_micro_all_str) #marginal r2
+```
+
+### Save outputs for figures
+
+```{r figure outputs}
+save(model_b, model_o, data_analysis_parasites, file = "../output/fig2.RData")
+
+save(PopDF_parasites, file = "../output/fig3.Rdata")
+
+save(model_micro_all_str_r2, model_micro_all_ar_r2, model_micro_all_ar, model_micro_all_str, file = "../output/microsat_figs.RData")
+
+save(coin_2, coin_9, coin_10, file = "../output/coia_supp_figs.RData")
+```
+

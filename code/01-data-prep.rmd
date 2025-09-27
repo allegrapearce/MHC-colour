@@ -1,0 +1,197 @@
+---
+title: "01-data-prep"
+author: "Allegra Love"
+date: "2025-09-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#library(gtsummary)
+library(tidyverse)
+```
+
+
+### Data Prep
+
+
+Load raw data
+```{r load DFs, echo = TRUE}
+rm(list = ls())
+# Individual immunity data
+MHCDF <- read.csv("../data/Full DF 2023-10-20.csv", header = T, row.names = NULL, stringsAsFactors = T, na.strings = "")
+# population immunity data
+PopDF <- read.csv("../data/microAr 2023-03-16.csv", header = F, row.names = NULL, na.strings = "")
+```
+
+
+```{r clean DFs, echo = FALSE}
+#renaming the allele and st columns for ease of use
+colnames(MHCDF) <- c("Fish","River","Site","Pred","Predation","Sex","Year","Tparasites","Infected",	"InfectedBinary", "Orange","Black","site","drainage","sex","length","n.gyros","colour_notes",	"Drainage",	"gt_1","gt_2","gt_3","gt_4","gt_5","gt_6","gt_7","gt_8","gt_9","st_1","st_2","st_3",	"st_4","st_5","st_6","st_7","st_8","st_9","Ai","STi")
+
+MHCDF$Drainage <- as.factor(str_replace(MHCDF$Drainage, 'North slope', 'North Slope'))
+
+#rename and clean Population df from appendix
+colnames(PopDF) <- PopDF[5,] #reassign column names
+PopDF <- PopDF[-(1:5), 1:21 , drop = FALSE] # remove empty rows and colour cols
+PopDF$Site <- str_replace(PopDF$Site, '-', '') # standardise site names
+PopDF$Site <- str_replace(PopDF$Site, 'El Cedro', 'ElCedro') 
+string_cols <- colnames(PopDF[,2:4])
+PopDF[string_cols] <- lapply(PopDF[string_cols] , factor)
+number_cols <- colnames(PopDF[,c(1,5:21)])
+PopDF[number_cols] <- lapply(PopDF[number_cols] , as.numeric)
+```
+
+create some basic dataframes that will be used for manipulating and creating final dataframe products for analysis.
+```{r prep DFs, echo = FALSE}
+#Calculating frequencies of each Supertype from genetic data
+# population level data available but not individual for this data
+
+ST_freq <- MHCDF %>% 
+  filter(!is.na(Orange) & !is.na(Black)) %>% 
+  filter(Year == 2010 & Sex == 'Male') %>% 
+  select(-Pred,-site,-sex,-n.gyros) %>% 
+  pivot_longer(cols = gt_1:st_9, names_pattern = "(.t)_(.)", names_to = c('.value','position'), values_drop_na = TRUE) %>% 
+  group_by(Fish, st) %>% 
+  summarize(freq = n()) %>% 
+  pivot_wider(names_from = st, values_from = freq, names_sort = TRUE, names_prefix = "ST_freq_") #no ST 10
+
+#excluding all 2009 guppies because we had unbalanced representation across sites and years
+data_analysis <- MHCDF %>% 
+    filter(!is.na(Orange) & !is.na(Black) & Year == '2010' & Sex == 'Male') %>% 
+  inner_join(., ST_freq, by = "Fish") %>% 
+  select(Fish:Site, Predation:InfectedBinary, Orange:Black, length, colour_notes, Drainage, Ai:ST_freq_15)
+
+# create a list of uninfected populations to exclude from analyses between immunity and colour
+no_parasite_sites <- data_analysis %>% 
+  group_by(Site) %>% 
+  summarise(max = max(Tparasites)) %>% 
+  filter(max < 1) %>% 
+  mutate(Site = droplevels(Site)) %>% # Drop unused levels
+  pull(Site)
+```
+
+
+### dataframe for 3. Linear models for population level
+```{r pop level linear models}
+#adding to pop_means to PopDF, removing populations with no colour data#adding to PopDF, removing populations with no colour dataOrange
+
+pop_level_dat <- data_analysis %>% 
+  group_by(Site) %>% 
+  summarize(mean_o = mean(Orange),
+            mean_b = mean(Black),
+            colour_n = n()) %>% 
+  add_row(data.frame(Site="All", mean_o=mean(data_analysis$Orange), mean_b=mean(data_analysis$Black), colour_n = nrow(data_analysis))) %>% 
+  inner_join(., PopDF, by = 'Site') %>% #create river column 
+  mutate(River = as.factor(gsub('[0-9]+', '', Site))) %>% 
+  mutate(Drainage_simple = gsub(' \\(Caroni type\\)', '', Drainage)) %>%  #creates a simplified column for drainage that includes turure
+  mutate(Drainage_simple = as.factor(Drainage_simple))
+```
+
+
+### Matrices for 1. Co-inertia analyses
+
+currently has turure 2 which was originally a caroni introduction (turure 3 was too but has no parsites).
+```{r coia data prep}
+#filter out sites with no parasites
+data_matrices <- data_analysis %>% 
+  filter(!Site %in% no_parasite_sites) %>% 
+  filter(Site != "ElCedro1") %>% #removed in original, parasite prev order of magnitude below
+  mutate(Site = droplevels(Site))
+
+## separate into matrices that will be be used in COIA analysis for pop and indiv. level
+### Parasite and colour
+colour_matrix <- data_matrices %>% 
+  select(Tparasites,Orange:Black)
+
+### MHC ST frequency
+mhc_f_matrix <- data_matrices %>% 
+  select(ST_freq_1:ST_freq_11) %>% # Supertype columns, some have NAs, not all fish have same number of STs
+  mutate_if(is.numeric, ~replace_na(., 0)) #replace NA with 0 for pca
+
+### allelic richness and ST richness
+mhc_r_matrix <- data_matrices %>% 
+  select(Ai, STi)
+
+#Population level
+PopDF_parasites <- pop_level_dat %>% 
+  filter(!Site %in% no_parasite_sites) %>% 
+  filter(Site != "ElCedro1") %>%  #removed in original study, parasite prev an order of magnitude below others
+  mutate(Site = as.factor(as.character(Site))) %>% 
+  rename(prevalence = `Gyrodactylus prevalence`, mhc_Ai = `MHC-Ar`, mhc_STi = `MHC-STr`)
+
+### Parasite and colour matrices for coia
+colour_matrix_pop <- PopDF_parasites %>% 
+  select(prevalence,mean_o,mean_b)
+
+### MHC ST frequency
+mhc_f_matrix_pop <- PopDF_parasites %>% 
+  select(ST1:ST11) %>% # Supertype columns, some have NAs, not all fish have same number of STs
+  mutate_if(is.numeric, ~replace_na(., 0)) #replace NA with 0 for pca
+
+### allelic richness and ST richness
+mhc_r_matrix_pop <- PopDF_parasites %>% 
+  select(mhc_Ai, mhc_STi)
+```
+
+### dataframe for 2. individual level mixed models
+```{r indiv mixed models}
+data_analysis_parasites <- data_analysis %>% 
+  filter(!Site %in% no_parasite_sites) %>% #remove uninfected sites
+  filter(Site != "ElCedro1") %>%  #removed because parasite prev an order of magnitude below others
+  mutate(Site = as.factor(as.character(Site))) 
+```
+
+
+### sample size table
+
+We have colour data for `r data_analysis %>% tally() %>% pull()` photos with corresponding MHC data, all photos were taken in 2010. These span `r n_distinct(data_analysis$Site)` sites. Below are the sample sizes by population for colour and genetic analyses
+
+```{r pop level linear models}
+knitr::kable((pop_level_dat %>% select(c(1,2,4,21,24:26))), 
+             col.names = c("Sample Number (MHC)", "Predation", "Site", "Gyrodactylus Prevalence", "Sample Number (Colour)", "River", "Drainage"), "simple")
+
+#for export 
+# write.table((pop_level_dat %>% 
+#   select(c(1, 2, 4, 21, 24:26)) %>% 
+#   rename(
+#     "Sample Number (MHC)" = 1,
+#     "Predation" = 2,
+#     "Site" = 3,
+#     "Gyrodactylus Prevalence" = 4,
+#     "Sample Number (Colour)" = 5,
+#     "River" = 6,
+#     "Drainage" = 7)),
+#   "output/sample_size_table.csv", quote = FALSE, sep = ",", row.names = FALSE)
+```
+
+
+### Save cleaned data for analysis script (02-data-analysis)
+
+Analyses and their data products
+1. Co-inertia analyses
+mhc_f_matrix
+mhc_r_matrix
+colour_matrix
+mhc_f_matrix_pop
+mhc_r_matrix_pop
+colour_matrix_pop
+PopDF_parasites
+data_matrices
+2. individual level mixed models
+data_analysis_parasites
+3. Linear models for population level
+PopDF (for population level models)
+
+
+```{r saving data for analysis}
+#analysis 1
+save(mhc_f_matrix, mhc_r_matrix, colour_matrix, mhc_f_matrix_pop, mhc_r_matrix_pop, colour_matrix_pop, PopDF_parasites, data_matrices, file = "../output/analysis_1.RData")
+
+#analysis 2
+save(data_analysis_parasites, file = "../output/analysis_2.RData")
+
+#analysis 3
+save(pop_level_dat, file = "../output/analysis_3.RData")
+```
