@@ -5,7 +5,6 @@ Differences in guppy (Poecilia reticulata) colour patterns can be driven by oppo
 
 This readme file was generated on 2025-09-27 by Allegra Love
 
--
 General information
 -
 1. Title of dataset:
@@ -137,3 +136,4 @@ Folder and file overview
 2. Relationship between files, if important:
 
 Must run files in code/ in numerical order (e.g., 01-data-prep.rmd needs to be run to run 02-data-analysis.rmd)
+
