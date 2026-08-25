@@ -91,7 +91,7 @@ bplot <- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]",
   geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
   geom_jitter(inherit.aes = FALSE,
              data = data_analysis_parasites,
-             aes(x = Tparasites, y = Black, colour = Drainage),
+             aes(x = Tparasites, y = Black, colour = Drainage, shape = Predation),
              width = 0.1, height = 0.0,
              alpha = 0.5) +
   scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
@@ -110,7 +110,7 @@ oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]",
   geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
   geom_jitter(inherit.aes = FALSE,
              data = data_analysis_parasites,
-             aes(x = Tparasites, y = Black, colour = Drainage),
+             aes(x = Tparasites, y = Orange_squeezed, colour = Drainage, shape = Predation),
              width = 0.1, height = 0.0,
              alpha = 0.5) +
   scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
@@ -123,7 +123,7 @@ oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]",
   theme(legend.position = "bottom")
 
 
-jpeg(filename =  "../Figures/ColourParasite 2025-04-06.jpeg", width = 8, height = 4, units = "in", quality = 75, bg = "white", res = 300)
+png(filename = "../Figures/ColourParasite 2025-04-06.png", width = 8, height = 4, units = "in", bg = "white", res = 320)
 
 grid_arrange_shared_legend(bplot, oplot)
 dev.off()
@@ -144,41 +144,42 @@ drainage_colours <- c(  "Caroni" = "#ed3e3e",
   "Oropuche" = "#edd442",
   "Oropuche (Caroni Type)" = "#edd442")
 
-# jpeg(filename =  "../Figures/MS Alleles MHC 2025-04-06.jpeg", width = 10, height = 6, units = "in", quality = 75, bg = "white", res = 300)
-op <- par(mfrow = c(1,2)
-          , mar = c(5.1,5.1,4.1,2.1))
-plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai
-     , xlab = "Number of Unique Microsattelite Alleles", ylab = "MHC Allelic Richness"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17)
-     , cex = 2
-     , col = drainage_colours
-     , xlim = c(6.5,9.0)
+png(filename =  "../Figures/fig_3_2026-08-19.png", width = 10, height = 5, units = "in", bg = "white", res = 320)
+op <- par(mfrow = c(1,2), 
+          mar = c(5.1,5.1,2.1,2.1))
+plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai, 
+     xlab = expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop]))), 
+     ylab = (MHC ~ Allelic ~ Richness ~ (MHC-italic(Ar[pop]))), 
+     pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), 
+     cex = 2, 
+     col = drainage_colours, 
+     xlim = c(6.5,9.0)
      )
 regLine(lm(PopDF_parasites$mhc_Ai ~ PopDF_parasites$`Micro-Ar`), col = "black")
 
-legend(x = 6.5, y = 8
-       , c("High Predation", "Low Predation")
-       , pch = c(19,17)
-       , bty = "n"
-       , pt.bg = c("black"), pt.cex = 2, cex = 1.05)
-legend(x = 6.5, y = 7.5
-       , legend = names(drainage_colours)[1:3]
-       , col = drainage_colours[1:3]
-       , pch = 18
-       , bty = "n"
-       , pt.cex = 2
-       , cex = 1.05)
-plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi
-     , xlab = "Number of Unique Microsattelite Alleles"
-     , ylab = "Number of Unique MHC \nSupertypes Represented by Alleles"
-     , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17)
-     , cex = 2
-     , col = drainage_colours
-     , xlim = c(6.5,9.0)
+legend(x = 6.5, y = 8, 
+       c("High Predation", "Low Predation"), 
+       pch = c(19,17), 
+       bty = "n", 
+       pt.bg = c("black"), pt.cex = 2, cex = 1.05)
+legend(x = 6.5, y = 7.5, 
+       legend = names(drainage_colours)[1:3], 
+       col = drainage_colours[1:3], 
+       pch = 18, 
+       bty = "n", 
+       pt.cex = 2, 
+       cex = 1.05)
+plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi, 
+     xlab = expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop]))), 
+     ylab = expression(MHC ~ Supertype ~ Richness ~ (MHC-italic(STr[pop]))), 
+     pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), 
+     cex = 2, 
+     col = drainage_colours, 
+     xlim = c(6.5,9.0)
      )
 regLine(lm(PopDF_parasites$mhc_STi ~ PopDF_parasites$`Micro-Ar`), col = "black")
 par(op)
-# dev.off()
+dev.off()
 ```
 
 ### Microsat figures
@@ -212,8 +213,8 @@ data.frame(ggeffects::ggpredict(model_micro_all_ar, terms = c("Micro-Ar", "Preda
              data = PopDF,
              aes(y = `MHC-Ar`, x = `Micro-Ar`, colour = Predation),
              alpha = 0.5) +
-  xlab("Microsatellite Richness") +
-  ylab("MHC Allelic Richness")
+  xlab(expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop])))) +
+  ylab(expression(MHC ~ Supertype ~ Richness ~ (Micro-italic(Ar[pop]))))
 
 
 
@@ -225,8 +226,8 @@ data.frame(ggeffects::ggpredict(model_micro_all_str, terms = c("Micro-Ar", "Pred
              data = PopDF,
              aes(y = `MHC-STr`, x = `Micro-Ar`, colour = Predation),
              alpha = 0.5) +
-  xlab("Microsatellite Richness") +
-  ylab("MHC Supertype Richness")
+  xlab(expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop])))) +
+  ylab(expression(MHC ~ Supertype ~ Richness ~ (Micro-italic(STr[pop]))))
 
 ```
 
@@ -234,15 +235,18 @@ data.frame(ggeffects::ggpredict(model_micro_all_str, terms = c("Micro-Ar", "Pred
 
 ```{r Supp fig 3}
 #Supplemental Figure 3
-# jpeg(filename =  "../Figures/Non Effect Colour 2025-04-06.jpeg", width = 8, height = 8, units = "in", quality = 75, bg = "white", res = 300)
-op <- par(mfrow = c(2,2)
-          , cex.lab = 1.5)
+png(filename =  "../Figures/Non_Effect Colour_2026-08-19.png", width = 8, height = 8, units = "in", bg = "white", res = 300)
+op <- par(mfrow = c(2,2),
+          mar = c(6.5, 4.1, 1.1, 2.1),
+          cex.lab = 1.5)
 #orange colours
 plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_o
-     , xlab = "Number of unique supertypes", ylab = "Relative Orange Area"
+     , xlab = "", ylab = "Relative Orange Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
+title(xlab = expression(atop(MHC ~ Supertype ~ Richness,(MHC-italic(Ar[pop])))), 
+      mgp = c(5, 1, 0))
 legend(x = 4.1, y = 0.17
        , c("High Predation", "Low Predation")
        , pch = c(19,17)
@@ -257,25 +261,31 @@ legend(x = 4.1, y = 0.15
        , cex = 1.05)
 regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$mhc_STi), col = "black")
 plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_b
-     , xlab = "Number of unique supertypes", ylab = "Relative Black Area"
+     , xlab = "", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
+title(xlab = expression(atop(MHC ~ Supertype ~ Richness, (MHC-italic(STr[pop])))), 
+      mgp = c(5, 1, 0))
 regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$mhc_STi), col = "black")
 plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_o
-     , xlab = "MHC Allelic Richness", ylab = "Relative Orange Area"
+     , xlab = "", ylab = "Relative Orange Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
+title(xlab = expression(atop(MHC ~ Supertype ~ Richness,(MHC-italic(Ar[pop])))), 
+      mgp = c(5, 1, 0))
 regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$mhc_Ai), col = "black")
 plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_b
-     , xlab = "MHC Allelic Richness", ylab = "Relative Black Area"
+     , xlab = "", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
+title(xlab = expression(atop(MHC ~ Supertype ~ Richness,(MHC-italic(Ar[pop])))), 
+      mgp = c(5, 1, 0))
 regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$mhc_Ai), col = "black")
 par(op)
-# dev.off()
+dev.off()
 
 ```
 
@@ -316,3 +326,8 @@ width=4, height=4)
  ade4::s.arrow(coin_10$c1)
 dev.off()
 ```
+
+
+## Parasite figure
+
+maybe a figure representing the difference between intensity and infection incidence?

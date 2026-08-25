@@ -14,14 +14,31 @@ library(ade4)
 library(corrr)
 library(lme4)
 library(r2glmm)
+library(performance)
+library(flextable)
+library(officer)
+library(glmmTMB)
+library(lmerTest)
+
+#read in cleaned data
+#analysis 1
+load(file = "../output/analysis_1.RData")
+#analysis 2
+load(file = "../output/analysis_2.RData")
+#analysis 3
+load(file = "../output/analysis_3.RData")
 ```
+
+
+**To Do:**
+- non-linear model for MHC diversity and parasitism
+- re-run individual models with binary infected/uninfected (done, and colour models but I don't think they requested that)
+- test quadratic terms for individual MHC allelic richness and supertype richness(e.g., Herdegen et al. 2014, doi:10.1111/jeb.12290)
+- simple null comparison using microsatellite diversity
+- add an explicit analysis across all populations, modelling colour as a function of drainage, predation regime, MHC diversity, and neutral genetic diversity, without Gyrodactylus
+
 
 ### 1. Co-inertia analyses
-
-```{r coia data include = FALSE}
-load("../output/analysis_1.RData")
-```
-
 
 **COIA(1)**
 
@@ -210,29 +227,26 @@ cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST11, method = "pearson")
 
 Linear mixed models that control for both predation and drainage
 
-```{r indiv lmms data include = FALSE}
-load("../output/analysis_2.RData")
-```
-
 
 ```{r individual level models colour}
-model_o <- lmer(Orange ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #north drainage and low pred almost sig
+#model_o <- lmer(Orange ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #north drainage and low pred almost sig
+
+#we have one 0 value in the dataset which cannot be tolerated by a betabinomial distribution
+N <- nrow(data_analysis_parasites)
+data_analysis_parasites$Orange_squeezed <- (((data_analysis_parasites$Orange * (N - 1)) + 0.5) / N)
+
+model_o <- glmmTMB(Orange_squeezed ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1 | Site), data = data_analysis_parasites, family = beta_family())
+
 model_b <- lmer(Black ~ Tparasites + Ai + STi + Predation + Drainage + Tparasites:Drainage + (1|Site), data = data_analysis_parasites) #oropouche drainage sig
 
-#check_model(model_o)
-#check_model(model_b)
+check_model(model_o)
+check_model(model_b)
 
 #currently presenting summary statistics in text
 summary(model_o)
 summary(model_b)
-#car::Anova(model_o)
-#car::Anova(model_b)
 
-merged_tbl <- tbl_merge(tbls = list(tbl_regression(model_o),tbl_regression(model_b)),tab_spanner = c("**Orange**", "**Black**"))
-
-model_o_r2 <- r2beta(model_o)
 model_b_r2 <- r2beta(model_b)
-plot(model_o_r2)
 plot(model_b_r2)
 
 ```
@@ -240,8 +254,9 @@ plot(model_b_r2)
 
 individual level parasite model, no colour.
 ```{r individual models parasites}
-model_para <- glmer(Tparasites ~ Ai + STi + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "poisson")
+model_para <- glmer(Tparasites ~ Ai  + STi  + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "poisson")
 
+check_model(model_para)
 summary(model_para)
 #car::Anova(model_para)
 
@@ -261,14 +276,140 @@ data.frame(ggeffects::ggpredict(model_para, terms = c("Ai", "Predation"))) %>%
 ```
 
 
+with orthogonal polynomial term to assess the relevance of the quadratic term, marginally significant quadratic term
+
+but if we are looking at prevalence vs number of parasites maybe doing intensity is more appropriate.
+```{r quad model}
+#high collinearity between polynomial terms for Ai and STI so used mdoel selection to proceed with the better model
+model_both_quad <- glmer(Tparasites ~ poly(Ai, 2, raw = FALSE) + poly(STi, 2, raw = FALSE) + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "poisson") #high VIF may be a bug in performance package from using polynomials
+
+model_ai_quad <- glmer(Tparasites ~ poly(Ai, 2, raw = FALSE) + STi + Predation + Drainage + (1|Site), 
+                       data = data_analysis_parasites, family = "poisson") #convergence warning
+
+model_sti_quad <- glmer(Tparasites ~ Ai + poly(STi, 2, raw = FALSE) + Predation + Drainage + (1|Site), 
+                       data = data_analysis_parasites, family = "poisson") 
+
+# Compare AIC scores
+compare_performance(model_both_quad, model_ai_quad, model_sti_quad, rank = TRUE) # model_sti_quad has lowest AIC
+AIC(model_both_quad, model_ai_quad, model_sti_quad) # AIC within 2 units but STi quad model is lower
+
+check_model(model_sti_quad)
+summary(model_sti_quad)
+```
+
+
+```{r quad model visualization}
+tbl_regression(model_sti_quad, exponentiate = TRUE)
+
+data.frame(ggeffects::predict_response(model_sti_quad, terms = c("STi [all]", "Predation"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
+  geom_line(aes(colour = group), linewidth = 1) +
+  geom_point(data = data_analysis_parasites,
+             aes(x = STi, y = Tparasites, colour = Predation),
+             inherit.aes = FALSE,
+             alpha = 0.4, 
+             position = position_jitter(width = 0.1, height = 0.2)) +
+  labs(
+    x = "STi", # Or change to your actual variable name
+    y = "Individual Parasite Load",
+    fill = "Predation",
+    colour = "Predation"
+  )
+```
+
+### 2.2 individual models binary infection variable
+
+
+```{r individual level infection status colour}
+model_o_bin <- glmmTMB(Orange_squeezed ~ Infected + Ai + STi + Predation + Drainage + Infected:Drainage + (1|Site), data = data_analysis_parasites, family = beta_family())
+#north drainage and low pred sig
+model_b_bin <- lmer(Black ~ Infected + Ai + STi + Predation + Drainage + Infected:Drainage + (1|Site), data = data_analysis_parasites) #oropouche drainage sig
+
+check_model(model_o_bin)
+check_model(model_b_bin)
+
+#currently presenting summary statistics in text
+summary(model_o_bin)
+summary(model_b_bin)
+#car::Anova(model_o_bin)
+#car::Anova(model_b_bin)
+
+merged_tbl <- tbl_merge(tbls = list(tbl_regression(model_o_bin),tbl_regression(model_b_bin)),tab_spanner = c("**Orange**", "**Black**"))
+
+model_o_r2_bin <- r2beta(model_o_bin)
+model_b_r2_bin <- r2beta(model_b_bin)
+plot(model_o_r2_bin)
+plot(model_b_r2_bin)
+
+```
+
+individual level parasite (infected binary) model, no colour.
+```{r individual models parasites}
+model_para_bin <- glmer(Infected ~ Ai + STi + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "binomial") #singular fit due to site variance estimated as 0, model checks are okay
+
+check_model(model_para_bin)
+summary(model_para_bin)
+#car::Anova(model_para_bin)
+
+tbl_regression(model_para_bin, exponentiate = TRUE)
+
+#visualization, not in MS
+data.frame(ggeffects::ggpredict(model_para_bin, terms = c("Ai", "Predation"))) %>% 
+ggplot( aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.35) +
+  geom_line(aes(colour = group), size = 1) +
+  geom_point(inherit.aes = FALSE,
+             data = data_analysis_parasites,
+             aes(x = Ai, y = InfectedBinary, colour = Predation), 
+             alpha = 0.5,
+             position = position_jitter(height = 0.02, width = 0)) + 
+  xlab("MHC Allelic Richness") +
+  ylab("Infection Status")
+```
+binary model with quadratic term, not sure this is required. Maybe in supplement?
+
+```{r quad binary parasite model}
+model_both_quad_bin <- glmer(Infected ~ poly(Ai, 2, raw = FALSE) + poly(STi, 2, raw = FALSE) + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "binomial") #high VIF may be a bug in performance package from using polynomials
+
+model_ai_quad_bin <- glmer(Infected ~ poly(Ai, 2, raw = FALSE) + STi + Predation + Drainage + (1|Site), 
+                       data = data_analysis_parasites, family = "binomial") #convergence warning
+
+model_sti_quad_bin <- glmer(Infected ~ Ai + poly(STi, 2, raw = FALSE) + Predation + Drainage + (1|Site), 
+                       data = data_analysis_parasites, family = "binomial") 
+
+# Compare AIC scores
+compare_performance(model_both_quad_bin, model_ai_quad_bin, model_sti_quad_bin, rank = TRUE)
+AIC(model_both_quad_bin, model_ai_quad_bin, model_sti_quad_bin) # model_sti_quad has similar AIC so use this to parallel intensity model
+
+check_model(model_sti_quad_bin)
+summary(model_sti_quad_bin)
+```
+
+```{r binary quad model visualization}
+tbl_regression(model_sti_quad_bin, exponentiate = TRUE)
+
+data.frame(ggeffects::predict_response(model_sti_quad_bin, terms = c("STi [all]", "Predation"))) %>% 
+  ggplot(aes(x = x, y = predicted, group = group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high, fill = group), alpha = 0.2) +
+  geom_line(aes(colour = group), linewidth = 1) +
+  geom_point(data = data_analysis_parasites,
+             aes(x = STi, y = InfectedBinary, colour = Predation),
+             inherit.aes = FALSE,
+             alpha = 0.4, 
+             position = position_jitter(width = 0.1, height = 0.2)) +
+  labs(
+    x = "STi", # Or change to your actual variable name
+    y = "Individual Infection incidence",
+    fill = "Predation",
+    colour = "Predation"
+  )
+```
+
+
 ### 3. Linear models for population level
 
 Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level. Using a mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site), however conclusions are the same across both so will report with complete dataset in manuscript. 
-
-```{r pop lmms data include = FALSE}
-load("../output/analysis_3.RData")
-```
-
 
 ```{r microsat mixed model no turure, eval=FALSE}
 model_micro_ar <- lmer(`MHC-Ar` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
@@ -303,6 +444,158 @@ merged_tbl2 <- tbl_merge(tbls = list(tbl_regression(model_micro_all_str),tbl_reg
 model_micro_all_ar_r2 <- r2beta(model_micro_all_ar) #marginal r2
 model_micro_all_str_r2 <- r2beta(model_micro_all_str) #marginal r2
 ```
+Null model comparison
+
+Use microsatellite instead of MHC to see if that explains trends from MHC in colour, AIC modle comparison with MHC models?
+Darinage removed due to high collinearity
+```{r null model pop orange}
+model_o_null_para <- glmmTMB(mean_o ~ Predation + gyro_prevalence + `MHC-Ar` + `MHC-STr` + `Micro-Ar`, dispformula = ~ 1, data = pop_level_dat, family = beta_family())
+model_o_null_mhc<- glmmTMB(mean_o ~ Predation + `MHC-Ar` + `MHC-STr` + `Micro-Ar`, dispformula = ~ 1, data = pop_level_dat, family = beta_family())
+
+check_model(model_o_null_para)
+check_model(model_o_null_mhc)
+
+summary(model_o_null_para)
+summary(model_o_null_mhc)
+
+compare_performance(model_o_null_para, model_o_null_mhc, rank = T)
+```
+
+```{r null model pop black}
+model_b_null_para <- lm(mean_b ~ Predation + gyro_prevalence + `MHC-Ar` + `MHC-STr` + `Micro-Ar` , data = pop_level_dat)
+model_b_null_mhc <- lm(mean_b ~ Predation + `MHC-Ar` + `MHC-STr` + `Micro-Ar` , data = pop_level_dat)
+
+check_model(model_b_null_para)
+check_model(model_b_null_mhc)
+
+summary(model_b_null_para)
+summary(model_b_null_mhc)
+#car::Anova(model_b_null)
+compare_performance(model_b_null_para, model_b_null_mhc, rank = T)
+```
+
+Export of table for all population model comparison with and without parasites for both colours.
+```{r colour all pop tables}
+
+# Run comparison for Black models
+perf_black <- data.frame(compare_performance(model_b_null_para, model_b_null_mhc))
+
+# Extract predictor variable names
+perf_black$Variables <- sapply(list(model_b_null_para, model_b_null_mhc), function(mod) {
+  paste(labels(terms(mod)), collapse = ", ")
+})
+
+# Filter and reorder columns
+black_table <- perf_black[, c("Name", "Variables", "R2", "AIC_wt")]
+
+# Run comparison for Orange models (swapping _b_ to _o_)
+perf_orange <- data.frame(compare_performance(model_o_null_para, model_o_null_mhc))
+
+# Extract predictor variable names
+perf_orange$Variables <- sapply(list(model_o_null_para, model_o_null_mhc), function(mod) {
+  paste(labels(terms(mod)), collapse = ", ")
+})
+
+# Filter and reorder columns
+orange_table <- perf_orange[, c("Name", "Variables", "R2", "AIC_wt")]
+
+# Create and format Black flextable
+ft_black <- flextable(black_table)
+ft_black <- theme_vanilla(ft_black)
+ft_black <- autofit(ft_black)
+ft_black <- bold(ft_black, part = "header")
+ft_black <- align(ft_black, align = "center", part = "all")
+ft_black <- bg(ft_black, bg = "#f2f2f2", i = ~ seq_len(nrow(black_table)) %% 2 == 0)
+
+# Create and format Orange flextable
+ft_orange <- flextable(orange_table)
+ft_orange <- theme_vanilla(ft_orange)
+ft_orange <- autofit(ft_orange)
+ft_orange <- bold(ft_orange, part = "header")
+ft_orange <- align(ft_orange, align = "center", part = "all")
+ft_orange <- bg(ft_orange, bg = "#f2f2f2", i = ~ seq_len(nrow(orange_table)) %% 2 == 0)
+
+# Initialize a new Word document object
+doc <- read_docx()
+
+# Add Black Table section
+doc <- body_add_par(doc, "Black Population Models", style = "heading 1")
+doc <- body_add_flextable(doc, value = ft_black)
+
+# Add spacing between the tables
+doc <- body_add_par(doc, "", style = "Normal") 
+
+# Add Orange Table section
+doc <- body_add_par(doc, "Orange Population Models", style = "heading 1")
+doc <- body_add_flextable(doc, value = ft_orange)
+
+# Save the final consolidated file
+print(doc, target = "../output/colour_allpop_table.docx")
+
+```
+
+
+Comparison of models with neutral genetic diversity (microsatellites) and MHC diversity (allelic and supertype richness), This is completed at the population level only as we have only population averages for microsatellite diversity.
+```{r null with parasites}
+model_para_null <- lm(prevalence ~ Predation + `Micro-Ar` , data = PopDF_parasites) 
+model_para_null2 <- lm(prevalence ~ Predation + mhc_Ai + mhc_STi + `Micro-Ar` , data = PopDF_parasites) 
+model_para_null3 <- lm(prevalence ~ Predation + mhc_Ai + mhc_STi, data = PopDF_parasites) 
+
+# model_para_null <- lm(gyro_prevalence ~ Predation + `Micro-Ar` , data = pop_level_dat) 
+# model_para_null2 <- lm(gyro_prevalence ~ Predation + `MHC-Ar` + `MHC-STr` + `Micro-Ar` , data = pop_level_dat) 
+# model_para_null3 <- lm(gyro_prevalence ~ Predation + `MHC-Ar` + `MHC-STr` , data = pop_level_dat) 
+
+summary(model_para_null)
+summary(model_para_null2)
+summary(model_para_null3)
+
+compare_performance(model_para_null, model_para_null2, model_para_null3, rank = T) # model without microsat is best
+```
+
+model comparison table export for null model with and without microsat to determine how much explanatory power MHC diversity adds for prevalence. 
+```{r table for parasite comp}
+performance_table <- data.frame(compare_performance(model_para_null, model_para_null2, model_para_null3))
+performance_table$Variables <- sapply(list(model_para_null, model_para_null2, model_para_null3), function(mod) {
+  # Get the formula terms, drop the response variable
+  paste(labels(terms(mod)), collapse = ", ")
+})
+
+#select and reorder columns
+final_table <- performance_table[, c("Name", "Variables", "R2", "AIC_wt")]
+
+# create flextable object and do basic formatting
+ft <- flextable(final_table)
+ft <- theme_vanilla(ft)
+ft <- autofit(ft)
+ft <- bold(ft, part = "header")
+ft <- align(ft, align = "center", part = "all")
+ft <- bg(ft, bg = "#f2f2f2", i = ~ seq_len(nrow(final_table)) %% 2 == 0) # Alternating row colors
+
+# Save as a word doc
+doc <- read_docx()
+doc <- body_add_flextable(doc, value = ft)
+print(doc, target = "../output/parasite_nullmodel_table.docx")
+```
+
+### reviewer 3 comments
+
+is gaussian distribution appropriate for colour models
+```{r distribution comment}
+# black is normally distributed
+ggplot(data_analysis_parasites, aes(Black)) + 
+  geom_histogram(colour = "grey25", binwidth = .03) + 
+  geom_density(colour = "coral") +
+  labs( x = "Relative Area Black", y = "Count")
+
+#left skew for orange, models changed to beta-binomial distribution as suggested by reviewer
+ggplot(data_analysis_parasites, aes(Orange)) + 
+  geom_histogram(fill = "coral", colour = "grey25", binwidth = .03) + 
+  geom_density(colour = "grey25") +
+  labs( x = "Relative Area Orange", y = "Count")
+
+```
+
+
 
 ### Save outputs for figures
 
@@ -314,5 +607,81 @@ save(PopDF_parasites, file = "../output/fig3.Rdata")
 save(model_micro_all_str_r2, model_micro_all_ar_r2, model_micro_all_ar, model_micro_all_str, file = "../output/microsat_figs.RData")
 
 save(coin_2, coin_9, coin_10, file = "../output/coia_supp_figs.RData")
+```
+
+
+### putative allele counts and summary
+
+```{r total population set}
+col_names <- c("Sample",	"Site",	"Drainage",	"a_1",	"a_2",	"a_3",	"a_4",	"a_5",	"a_6","a_7",	"a_8",	"a_9", "st_1",	"st_2",	"st_3",	"st_4",	"st_5",	"st_6",	"st_7",	"st_8",	"st_9","Ai","STi")
+genotype_dat <- read.csv("../data/Appendix_5.csv", header = FALSE, skip = 5) %>% 
+  select(1:12,14:22,24:25) %>% 
+  rename_with(~ col_names, everything()) %>% 
+  pivot_longer(
+    cols = matches("^(a|st)_\\d+$"),
+    names_to = c(".value", "pair_index"),
+    names_pattern = "(a|st)_(\\d+)"
+  ) %>% 
+  rename(allele = a, supertype = st) %>% 
+  select(-pair_index) %>% 
+  filter(allele != "")
+
+genotype_dat$Site <- str_replace(genotype_dat$Site, ' ', '') # standardise site names
+genotype_dat$Site <- str_replace(genotype_dat$Site, 'Elcedro ', 'ElCedro') 
+
+good_sites <- pop_level_dat$Site
+
+allele_counts <- genotype_dat %>% 
+  filter(Site %in% good_sites) %>% 
+  group_by(allele) %>% 
+  summarize(num_individuals = n_distinct(Sample), num_populations = n_distinct(Site)) %>% 
+  # Group by whether they are private or shared
+  mutate(status = case_when(
+    num_populations == 1 ~ "private", #unique to 1 site
+    num_populations >= 2 ~ "shared" #2 or more sites
+  ))
+
+# find total number of alleles
+nrow(allele_counts) # 177
+
+#rare putative alleles (in one individual)
+allele_counts %>% 
+  filter(num_individuals == 1) %>% 
+  nrow() #32
+
+# private vs shared alleles
+allele_counts %>% 
+  count(status) # 99 private and 78 shared
+```
+
+
+```{r only parasite pops}
+#only parasite populations
+gyro_sites <- pop_level_dat %>% 
+  filter(gyro_prevalence > 0) %>% 
+  pull(Site)
+
+allele_counts_gyro <- genotype_dat %>% 
+  filter(Site %in% gyro_sites) %>% 
+  group_by(allele) %>% 
+  summarize(num_individuals = n_distinct(Sample), num_populations = n_distinct(Site)) %>% 
+  # Group by whether they are private or shared
+  mutate(status = case_when(
+    num_populations == 1 ~ "private", #unique to 1 site
+    num_populations >= 2 ~ "shared" #2 or more sites
+  ))
+
+# find total number of alleles
+nrow(allele_counts_gyro) # 137
+
+#rare putative alleles (in one individual)
+allele_counts_gyro %>% 
+  filter(num_individuals == 1) %>% 
+  nrow() #28
+
+# private vs shared alleles
+allele_counts_gyro %>% 
+  count(status) # 78 private and 59 shared
+
 ```
 

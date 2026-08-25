@@ -86,7 +86,8 @@ pop_level_dat <- data_analysis %>%
   inner_join(., PopDF, by = 'Site') %>% #create river column 
   mutate(River = as.factor(gsub('[0-9]+', '', Site))) %>% 
   mutate(Drainage_simple = gsub(' \\(Caroni type\\)', '', Drainage)) %>%  #creates a simplified column for drainage that includes turure
-  mutate(Drainage_simple = as.factor(Drainage_simple))
+  mutate(Drainage_simple = as.factor(Drainage_simple)) %>% 
+  rename(gyro_prevalence = `Gyrodactylus prevalence`)
 ```
 
 
@@ -119,7 +120,7 @@ PopDF_parasites <- pop_level_dat %>%
   filter(!Site %in% no_parasite_sites) %>% 
   filter(Site != "ElCedro1") %>%  #removed in original study, parasite prev an order of magnitude below others
   mutate(Site = as.factor(as.character(Site))) %>% 
-  rename(prevalence = `Gyrodactylus prevalence`, mhc_Ai = `MHC-Ar`, mhc_STi = `MHC-STr`)
+  rename(prevalence = gyro_prevalence, mhc_Ai = `MHC-Ar`, mhc_STi = `MHC-STr`)
 
 ### Parasite and colour matrices for coia
 colour_matrix_pop <- PopDF_parasites %>% 
@@ -150,7 +151,7 @@ We have colour data for `r data_analysis %>% tally() %>% pull()` photos with cor
 
 ```{r pop level linear models}
 knitr::kable((pop_level_dat %>% select(c(1,2,4,21,24:26))), 
-             col.names = c("Sample Number (MHC)", "Predation", "Site", "Gyrodactylus Prevalence", "Sample Number (Colour)", "River", "Drainage"), "simple")
+             col.names = c("Sample Number (MHC)", "Predation", "Site", "gyro_prevalence", "Sample Number (Colour)", "River", "Drainage"), "simple")
 
 #for export 
 # write.table((pop_level_dat %>% 
