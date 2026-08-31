@@ -27,15 +27,14 @@ load(file = "../output/analysis_1.RData")
 load(file = "../output/analysis_2.RData")
 #analysis 3
 load(file = "../output/analysis_3.RData")
+
+pop_level_dat <- pop_level_dat %>% 
+  mutate(gyro_present = ifelse(gyro_prevalence > 0.1, "Yes", "No")) %>% 
+  rename(MHC_Ar = `MHC-Ar`, MHC_STr = `MHC-STr`, Micro_Ar = `Micro-Ar`)
+PopDF_parasites <- PopDF_parasites %>% 
+  rename(Micro_Ar = `Micro-Ar`, MHC_Ar = mhc_Ai, MHC_STr = mhc_STi)
 ```
 
-
-**To Do:**
-- non-linear model for MHC diversity and parasitism
-- re-run individual models with binary infected/uninfected (done, and colour models but I don't think they requested that)
-- test quadratic terms for individual MHC allelic richness and supertype richness(e.g., Herdegen et al. 2014, doi:10.1111/jeb.12290)
-- simple null comparison using microsatellite diversity
-- add an explicit analysis across all populations, modelling colour as a function of drainage, predation regime, MHC diversity, and neutral genetic diversity, without Gyrodactylus
 
 
 ### 1. Co-inertia analyses
@@ -201,11 +200,11 @@ PopDF_parasites %>%
   correlate() %>% 
   focus(mean_o)
 
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$mhc_STi, method = "pearson") #sig
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$mhc_Ai, method = "pearson") #sig
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$MHC_STr, method = "pearson") #sig
+cor.test(PopDF_parasites$mean_o, PopDF_parasites$MHC_Ar, method = "pearson") #sig
 
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$mhc_STi, method = "pearson") #sig
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$mhc_Ai, method = "pearson") #sig
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$MHC_STr, method = "pearson") #sig
+cor.test(PopDF_parasites$prevalence, PopDF_parasites$MHC_Ar, method = "pearson") #sig
 
 #of the ST none correlated with orange
 cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST1, method = "pearson")
@@ -353,12 +352,12 @@ data.frame(ggeffects::predict_response(model_sti_quad, terms = c("STi [all]", "P
 ### 2.2 individual models binary infection variable
 
 individual level parasite (infected binary) model, no colour quadratic term.
-
+Singular fit warnings as random factor Site is not explaining any variation (explained by drainage?)
 ```{r quad binary parasite model}
 model_both_quad_bin <- glmer(Infected ~ poly(Ai, 2, raw = FALSE) + poly(STi, 2, raw = FALSE) + length_sc + Predation + Drainage + (1|Site), data = data_analysis_parasites, family = "binomial") #high VIF may be a bug in performance package from using polynomials
 
 model_ai_quad_bin <- glmer(Infected ~ poly(Ai, 2, raw = FALSE) + STi + length_sc + Predation + Drainage + (1|Site), 
-                       data = data_analysis_parasites, family = "binomial") #convergence warning
+                       data = data_analysis_parasites, family = "binomial")
 
 model_sti_quad_bin <- glmer(Infected ~ Ai + poly(STi, 2, raw = FALSE) + length_sc + Predation + Drainage + (1|Site), 
                        data = data_analysis_parasites, family = "binomial") 
@@ -429,12 +428,12 @@ tbl_merge(tbls = parasite_table, tab_spanner = names(parasite_table)) %>%
 Using Micro-Ar as the independent variable and MHC-Ar and MHC-STr as dependent variables at the population level. Using a mixed model to account for drainage differences. Run these with and without Turure (as it is an introduction site), however conclusions are the same across both so will report with complete dataset in manuscript. 
 
 ```{r microsat mixed model no turure, eval=FALSE}
-model_micro_ar <- lmer(`MHC-Ar` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+model_micro_ar <- lmer(MHC_Ar ~ Micro_Ar + Predation + (1|Drainage_simple), data = pop_level_dat)
 
 #check_model(model_micro_ar)
 summary(model_micro_ar)
 
-model_micro_str <- lmer(`MHC-STr` ~ `Micro-Ar` + Predation + (1|Drainage), data = PopDF %>% filter(!Drainage == "Oropuche (Caroni type)"))
+model_micro_str <- lmer(MHC_STr ~ Micro_Ar + Predation + (1|Drainage_simple), data = pop_level_dat)
 
 #check_model(model_micro_str)
 summary(model_micro_str)
@@ -444,13 +443,13 @@ summary(model_micro_str)
 ```{r microsat mixed model}
 #Predation regime may contribute variance but only has two levels and will be added as a fixed factor
 
-model_micro_all_ar <- lmer(`MHC-Ar` ~ `Micro-Ar` + (1|Predation) + (1|Drainage), data = pop_level_dat)
+model_micro_all_ar <- lmer(MHC_Ar ~ Micro_Ar + (1|Predation) + (1|Drainage_simple), data = pop_level_dat)
 r2(model_micro_all_ar)
 
 #check_model(model_micro_all_ar)
 summary(model_micro_all_ar)
 
-model_micro_all_str <- lmer(`MHC-STr` ~ `Micro-Ar` + (1|Predation) + (1|Drainage), data = pop_level_dat)
+model_micro_all_str <- lmer(MHC_STr ~ Micro_Ar + (1|Predation) + (1|Drainage_simple), data = pop_level_dat)
 r2(model_micro_all_str)
 #check_model(model_micro_all_str)
 summary(model_micro_all_str)
@@ -466,7 +465,7 @@ microsat_table <- imap(microsat_models, function(model, name) {
     component = "cond", 
     estimate_fun = function(x) style_sigfig(x, digits = 3), 
     pvalue_fun = function(x) style_pvalue(x, digits = 3),
-    label = list(`Micro-Ar`        ~ "Micro-Ar")) %>%
+    label = list(Micro_Ar        ~ "Micro-Ar")) %>%
     #modify_column_hide(columns = groupname_col) %>% 
     modify_table_styling(
       columns = everything(), 
@@ -487,8 +486,8 @@ Null model comparison
 Use microsatellite information in addition to MHC to see if that explains trends in colour, use a simple AIC comparison with MHC models to show MHC information improves predictive power of model
 Drainage removed due to high collinearity
 ```{r null model pop orange}
-model_o_null_para <- glmmTMB(mean_o ~ Predation + gyro_prevalence + `MHC-Ar` + `MHC-STr` + `Micro-Ar`, dispformula = ~ 1, data = pop_level_dat, family = beta_family())
-model_o_null_mhc<- glmmTMB(mean_o ~ Predation + `MHC-Ar` + `MHC-STr` + `Micro-Ar`, dispformula = ~ 1, data = pop_level_dat, family = beta_family())
+model_o_null_para <- glmmTMB(mean_o ~ Predation + gyro_prevalence + MHC_Ar + MHC_STr + Micro_Ar, dispformula = ~ 1, data = pop_level_dat, family = beta_family())
+model_o_null_mhc<- glmmTMB(mean_o ~ Predation + MHC_Ar + MHC_STr + Micro_Ar, dispformula = ~ 1, data = pop_level_dat, family = beta_family())
 
 check_model(model_o_null_para)
 check_model(model_o_null_mhc)
@@ -501,8 +500,8 @@ compare_performance(model_o_null_para, model_o_null_mhc, rank = T)
 
 
 ```{r null model pop black}
-model_b_null_para <- lm(mean_b ~ Predation + gyro_prevalence + `MHC-Ar` + `MHC-STr` + `Micro-Ar` , data = pop_level_dat)
-model_b_null_mhc <- lm(mean_b ~ Predation + `MHC-Ar` + `MHC-STr` + `Micro-Ar` , data = pop_level_dat)
+model_b_null_para <- lm(mean_b ~ Predation + gyro_prevalence + MHC_Ar + MHC_STr + Micro_Ar , data = pop_level_dat)
+model_b_null_mhc <- lm(mean_b ~ Predation + MHC_Ar + MHC_STr + Micro_Ar , data = pop_level_dat)
 
 check_model(model_b_null_para)
 check_model(model_b_null_mhc)
@@ -576,12 +575,12 @@ print(doc, target = "../output/colour_allpop_table.docx")
 
 Comparison of models with neutral genetic diversity (microsatellites) and MHC diversity (allelic and supertype richness), This is completed at the population level only as we have only population averages for microsatellite diversity.
 ```{r null with parasites}
-model_para_null <- lm(prevalence ~ Predation + `Micro-Ar` , data = PopDF_parasites) 
-model_para_null2 <- lm(prevalence ~ Predation + mhc_Ai + mhc_STi + `Micro-Ar` , data = PopDF_parasites) 
-model_para_null3 <- lm(prevalence ~ Predation + mhc_Ai + mhc_STi, data = PopDF_parasites) 
+model_para_null <- lm(prevalence ~ Predation + Micro_Ar , data = PopDF_parasites) 
+model_para_null2 <- lm(prevalence ~ Predation + MHC_Ar + MHC_STr + Micro_Ar , data = PopDF_parasites) 
+model_para_null3 <- lm(prevalence ~ Predation + MHC_Ar + MHC_STr, data = PopDF_parasites) 
 
-# model_para_null <- lm(gyro_prevalence ~ Predation + `Micro-Ar` , data = pop_level_dat) 
-# model_para_null2 <- lm(gyro_prevalence ~ Predation + `MHC-Ar` + `MHC-STr` + `Micro-Ar` , data = pop_level_dat) 
+# model_para_null <- lm(gyro_prevalence ~ Predation + Micro_Ar , data = pop_level_dat) 
+# model_para_null2 <- lm(gyro_prevalence ~ Predation + `MHC-Ar` + `MHC-STr` + Micro_Ar , data = pop_level_dat) 
 # model_para_null3 <- lm(gyro_prevalence ~ Predation + `MHC-Ar` + `MHC-STr` , data = pop_level_dat) 
 
 summary(model_para_null)
@@ -624,50 +623,48 @@ library(AICcmodavg)
 prevalence_analysis <- list(model_para_null, model_para_null2, model_para_null3)
 prevalence_names <- c("Prevalence ~ Predation + Micro-Ar", "Prevalence ~ Predation + MHC-Ar + MHC-STr + Micro-Ar", "Prevalence ~ Predation + MHC-Ar + MHC-STr")
 
-aic_dat <- aictab(cand.set = prevalence_analysis, modnames = prevalence_names) %>% 
-  mutate(analysis = "Prevalence, MHC and microsatellite diversity")
-
-prev_r2<- imap(prevalence_analysis, function(model, name) {
-  performance::r2(model)
-})
+aic_dat <- aictab(cand.set = prevalence_analysis, modnames = prevalence_names, second.ord = FALSE) %>% 
+  mutate(analysis = "Prevalence, MHC and microsatellite diversity", R2_conditional = NA, R2_marginal = NA) %>% 
+  cbind(compare_performance(prevalence_analysis, rank = T) %>%  select(R2))
 
 #mixed effect models will have conditional and marginal r2 reported
 orange_analysis <- list(model_o_null_para, model_o_null_mhc)
 orange_names <- c("Orange ~ Predation + Prevalence + MHC-Ar + MHC-STr + Micro-Ar", "Orange ~ Predation + MHC-Ar + MHC-STr + Micro-Ar")
 
-orange_r2<- imap(orange_analysis, function(model, name) {
-  performance::r2(model)
-})
 
+orange <- aictab(cand.set = orange_analysis, modnames = orange_names, second.ord = FALSE) %>% 
+  mutate(analysis = "Impact of parasitism on orange", R2_conditional = NA, R2_marginal = NA) %>% 
+  cbind(compare_performance(orange_analysis, rank = T) %>%  select(R2))
 
-orange <- aictab(cand.set = orange_analysis, modnames = orange_names) %>% 
-  mutate(analysis = "Impact of parasitism on orange")
-
-black_analysis <- list(model_o_null_para, model_o_null_mhc)
+black_analysis <- list(model_b_null_para, model_b_null_mhc)
 black_names <- c("Black ~ Predation + Prevalence + MHC-Ar + MHC-STr + Micro-Ar", "Black ~ Predation + MHC-Ar + MHC-STr + Micro-Ar")
 
-black <- aictab(cand.set = black_analysis, modnames = black_names) %>% 
-  mutate(analysis = "Impact of parasitism on black")
+black <- aictab(cand.set = black_analysis, modnames = black_names, second.ord = FALSE) %>% 
+  mutate(analysis = "Impact of parasitism on black", R2_conditional = NA, R2_marginal = NA) %>% 
+  cbind(compare_performance(black_analysis, rank = T) %>%  select(R2))
 
 quad_analysis <- list(model_sti_quad, model_ai_quad, model_both_quad)
 quad_names <- c("Abundance ~ poly(STi, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)", "Abundance ~ poly(MHC-Ar, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)", "Abundance ~ poly(MHC-Ar, 2, raw = FALSE) + poly(STi, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)")
 
-quad <- aictab(cand.set = quad_analysis, modnames = quad_names) %>% 
-  mutate(analysis = "Polynomial selection for abundance")
+quad <- aictab(cand.set = quad_analysis, modnames = quad_names, second.ord = FALSE) %>% 
+  mutate(analysis = "Polynomial selection for abundance", R2 = NA) %>% 
+  cbind(compare_performance(quad_analysis, rank = T) %>%  select(R2_conditional, R2_marginal))
 
 quad_analysis_bin <- list(model_sti_quad_bin, model_ai_quad_bin, model_both_quad_bin)
 quad_names_bin <- c("Infected ~ poly(STi, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)", "Infected ~ poly(MHC-Ar, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)", "Infected ~ poly(MHC-Ar, 2, raw = FALSE) + poly(STi, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)")
 
-quad_bin <- aictab(cand.set = quad_analysis_bin, modnames = quad_names_bin) %>% 
-  mutate(analysis = "Polynomial selection for infection status")
+quad_bin <- aictab(cand.set = quad_analysis_bin, modnames = quad_names_bin, second.ord = FALSE) %>% 
+  mutate(analysis = "Polynomial selection for infection status", R2 = NA, R2_conditional = NA) %>% 
+  cbind(compare_performance(quad_analysis_bin, rank = T) %>%  select(R2_marginal))
 
-aic_dat_all <- rbind(aic_dat, orange, black, quad, quad_bin) %>% 
-  select(analysis, Modnames, K, Delta_AICc, AICcWt) %>% 
-  rename("Analysis" = analysis, "Model Name" = Modnames, "Delta AICc" = Delta_AICc, "AIC Weight" = AICcWt) %>% 
+aic_dat_all<- rbind(aic_dat, orange, black, quad, quad_bin) %>% 
+  select(analysis, Modnames, K, Delta_AIC, AICWt, R2, R2_conditional, R2_marginal) %>% 
+  rename("Analysis" = analysis, "Model Name" = Modnames, "Delta AIC" = Delta_AIC, "AIC Weight" = AICWt) %>% 
+  mutate(across(where(is.numeric), ~signif(., 2))) %>% 
+  mutate(across(where(is.numeric), ~if_else(. == 0, "0", sprintf("%.2f", .)))) %>% 
   as.data.frame() %>% 
   gt() %>%
   gtsave(filename = "../output/Table_S4_aic.docx")
-
 ```
 
 
@@ -676,7 +673,7 @@ aic_dat_all <- rbind(aic_dat, orange, black, quad, quad_bin) %>%
 ```{r figure outputs}
 save(model_b, model_o, data_analysis_parasites, file = "../output/fig2.RData")
 
-save(PopDF_parasites, file = "../output/fig3.Rdata")
+save(PopDF_parasites, pop_level_dat, file = "../output/fig3.Rdata")
 
 save(model_micro_all_str_r2, model_micro_all_ar_r2, model_micro_all_ar, model_micro_all_str, file = "../output/microsat_figs.RData")
 

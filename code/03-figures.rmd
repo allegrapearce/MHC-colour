@@ -12,6 +12,7 @@ library(ggplot2)
 library(gridExtra)
 library(grid)
 library(tidyverse)
+library(ggeffects)
 ```
 
 
@@ -138,6 +139,9 @@ load("../output/fig3.Rdata")
 
 
 ```{r Fig 3}
+#use output from models in text
+micro_ar_STr <- ggpredict(model_micro_all_str, terms = "Micro_Ar")
+micro_ar_Ar <- ggpredict(model_micro_all_ar, terms = "Micro_Ar")
 #triangles for low predation (17), coloured by drainage similar to map
 drainage_colours <- c(  "Caroni" = "#ed3e3e", 
   "North Slope" = "#425ced",
@@ -147,37 +151,38 @@ drainage_colours <- c(  "Caroni" = "#ed3e3e",
 png(filename =  "../Figures/fig_3_2026-08-19.png", width = 10, height = 5, units = "in", bg = "white", res = 320)
 op <- par(mfrow = c(1,2), 
           mar = c(5.1,5.1,2.1,2.1))
-plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_Ai, 
+plot(x = pop_level_dat$Micro_Ar, y = pop_level_dat$MHC_Ar, 
      xlab = expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop]))), 
      ylab = (MHC ~ Allelic ~ Richness ~ (MHC-italic(Ar[pop]))), 
-     pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), 
+     pch = ifelse(pop_level_dat$Predation == "High", 19, 17), 
      cex = 2, 
      col = drainage_colours, 
      xlim = c(6.5,9.0)
      )
-regLine(lm(PopDF_parasites$mhc_Ai ~ PopDF_parasites$`Micro-Ar`), col = "black")
-
+#regLine(lm(PopDF_parasites$MHC_Ar ~ PopDF_parasites$Micro_Ar), col = "black")
+lines(micro_ar_Ar$x, micro_ar_Ar$predicted, col = "black", lwd = 2)
 legend(x = 6.5, y = 8, 
        c("High Predation", "Low Predation"), 
        pch = c(19,17), 
        bty = "n", 
        pt.bg = c("black"), pt.cex = 2, cex = 1.05)
-legend(x = 6.5, y = 7.5, 
+legend(x = 6.5, y = 7.3, 
        legend = names(drainage_colours)[1:3], 
        col = drainage_colours[1:3], 
        pch = 18, 
        bty = "n", 
        pt.cex = 2, 
        cex = 1.05)
-plot(x = PopDF_parasites$`Micro-Ar`, y = PopDF_parasites$mhc_STi, 
+plot(x = pop_level_dat$Micro_Ar, y = pop_level_dat$MHC_STr, 
      xlab = expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop]))), 
      ylab = expression(MHC ~ Supertype ~ Richness ~ (MHC-italic(STr[pop]))), 
-     pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), 
+     pch = ifelse(pop_level_dat$Predation == "High", 19, 17), 
      cex = 2, 
      col = drainage_colours, 
      xlim = c(6.5,9.0)
      )
-regLine(lm(PopDF_parasites$mhc_STi ~ PopDF_parasites$`Micro-Ar`), col = "black")
+#regLine(lm(PopDF_parasites$MHC_STr ~ PopDF_parasites$Micro_Ar), col = "black")
+lines(micro_ar_STr$x, micro_ar_STr$predicted, col = "black", lwd = 2)
 par(op)
 dev.off()
 ```
@@ -211,7 +216,7 @@ data.frame(ggeffects::ggpredict(model_micro_all_ar, terms = c("Micro-Ar", "Preda
   geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
   geom_point(inherit.aes = FALSE,
              data = PopDF,
-             aes(y = `MHC-Ar`, x = `Micro-Ar`, colour = Predation),
+             aes(y = MHC_Ar, x = Micro_Ar, colour = Predation),
              alpha = 0.5) +
   xlab(expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop])))) +
   ylab(expression(MHC ~ Supertype ~ Richness ~ (Micro-italic(Ar[pop]))))
@@ -224,7 +229,7 @@ data.frame(ggeffects::ggpredict(model_micro_all_str, terms = c("Micro-Ar", "Pred
   geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
   geom_point(inherit.aes = FALSE,
              data = PopDF,
-             aes(y = `MHC-STr`, x = `Micro-Ar`, colour = Predation),
+             aes(y = MHC_STr, x = Micro_Ar, colour = Predation),
              alpha = 0.5) +
   xlab(expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop])))) +
   ylab(expression(MHC ~ Supertype ~ Richness ~ (Micro-italic(STr[pop]))))
@@ -234,18 +239,24 @@ data.frame(ggeffects::ggpredict(model_micro_all_str, terms = c("Micro-Ar", "Pred
 ### Supplemental Figure 3
 
 ```{r Supp fig 3}
+#use output from models in text
+pred_o_STi <- ggpredict(model_o_null_para, terms = "MHC_STr")
+pred_b_STi <- ggpredict(model_b_null_para, terms = "MHC_STr")
+pred_o_Ai  <- ggpredict(model_o_null_para, terms = "MHC_Ar")
+pred_b_Ai  <- ggpredict(model_b_null_para, terms = "MHC_Ar")
+
 #Supplemental Figure 3
 png(filename =  "../Figures/Non_Effect Colour_2026-08-19.png", width = 8, height = 8, units = "in", bg = "white", res = 300)
 op <- par(mfrow = c(2,2),
           mar = c(6.5, 4.1, 1.1, 2.1),
           cex.lab = 1.5)
 #orange colours
-plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_o
+plot(x = pop_level_dat$MHC_STr, y = pop_level_dat$mean_o
      , xlab = "", ylab = "Relative Orange Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
-title(xlab = expression(atop(MHC ~ Supertype ~ Richness,(MHC-italic(Ar[pop])))), 
+title(xlab = expression(atop(MHC ~ Supertype ~ Richness,(MHC-italic(STr[pop])))), 
       mgp = c(5, 1, 0))
 legend(x = 4.1, y = 0.17
        , c("High Predation", "Low Predation")
@@ -259,31 +270,37 @@ legend(x = 4.1, y = 0.15
        , bty = "n"
        , pt.cex = 2
        , cex = 1.05)
-regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$mhc_STi), col = "black")
-plot(x = PopDF_parasites$mhc_STi, y = PopDF_parasites$mean_b
+#regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$MHC_STr), col = "black")
+lines(pred_o_STi$x, pred_o_STi$predicted, col = "black", lwd = 2)
+plot(x = pop_level_dat$MHC_STr, y = pop_level_dat$mean_b
      , xlab = "", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
 title(xlab = expression(atop(MHC ~ Supertype ~ Richness, (MHC-italic(STr[pop])))), 
       mgp = c(5, 1, 0))
-regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$mhc_STi), col = "black")
-plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_o
+#regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$MHC_STr), col = "black")
+lines(pred_b_STi$x, pred_b_STi$predicted, col = "grey60", lwd = 2)
+
+plot(x = pop_level_dat$MHC_Ar, y = pop_level_dat$mean_o
      , xlab = "", ylab = "Relative Orange Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
-title(xlab = expression(atop(MHC ~ Supertype ~ Richness,(MHC-italic(Ar[pop])))), 
+title(xlab = expression(atop(MHC ~ Allelic ~ Richness,(MHC-italic(Ar[pop])))), 
       mgp = c(5, 1, 0))
-regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$mhc_Ai), col = "black")
-plot(x = PopDF_parasites$mhc_Ai, y = PopDF_parasites$mean_b
+#regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$MHC_Ar), col = "black")
+lines(pred_o_Ai$x, pred_o_Ai$predicted, col = "grey60", lwd = 2)
+
+plot(x = pop_level_dat$MHC_Ar, y = pop_level_dat$mean_b
      , xlab = "", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
      )
-title(xlab = expression(atop(MHC ~ Supertype ~ Richness,(MHC-italic(Ar[pop])))), 
+title(xlab = expression(atop(MHC ~ Allelic ~ Richness,(MHC-italic(Ar[pop])))), 
       mgp = c(5, 1, 0))
-regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$mhc_Ai), col = "black")
+#regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$MHC_Ar), col = "black")
+lines(pred_b_Ai$x, pred_b_Ai$predicted, col = "grey60", lwd = 2)
 par(op)
 dev.off()
 
