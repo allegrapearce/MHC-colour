@@ -124,9 +124,9 @@ oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]",
   theme(legend.position = "bottom")
 
 
-png(filename = "../Figures/ColourParasite 2026-08-19.png", width = 8, height = 4, units = "in", bg = "white", res = 320)
+png(filename = "../Figures/ColourParasite 2026-09-11.png", width = 8, height = 4, units = "in", bg = "white", res = 320)
 
-grid_arrange_shared_legend(bplot, oplot)
+grid_arrange_shared_legend(oplot, bplot)
 dev.off()
 
 ```
@@ -140,18 +140,18 @@ load("../output/fig3.Rdata")
 
 ```{r Fig 3}
 #use output from models in text
-micro_ar_STr <- ggpredict(model_micro_all_str, terms = "Micro_Ar")
-micro_ar_Ar <- ggpredict(model_micro_all_ar, terms = "Micro_Ar")
+micro_ar_STr <- ggpredict(model_micro_all_str, terms = "micro_Ai")
+micro_ar_Ar <- ggpredict(model_micro_all_ar, terms = "micro_Ai")
 #triangles for low predation (17), coloured by drainage similar to map
 drainage_colours <- c(  "Caroni" = "#ed3e3e", 
   "North Slope" = "#425ced",
   "Oropuche" = "#edd442",
   "Oropuche (Caroni Type)" = "#edd442")
 
-png(filename =  "../Figures/fig_3_2026-08-19.png", width = 10, height = 5, units = "in", bg = "white", res = 320)
+png(filename =  "../Figures/fig_3_2026-09-11.png", width = 10, height = 5, units = "in", bg = "white", res = 320)
 op <- par(mfrow = c(1,2), 
           mar = c(5.1,5.1,2.1,2.1))
-plot(x = pop_level_dat$Micro_Ar, y = pop_level_dat$MHC_Ar, 
+plot(x = pop_level_dat$micro_Ai, y = pop_level_dat$mhc_Ai, 
      xlab = expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop]))), 
      ylab = (MHC ~ Allelic ~ Richness ~ (MHC-italic(Ar[pop]))), 
      pch = ifelse(pop_level_dat$Predation == "High", 19, 17), 
@@ -173,7 +173,7 @@ legend(x = 6.5, y = 7.3,
        bty = "n", 
        pt.cex = 2, 
        cex = 1.05)
-plot(x = pop_level_dat$Micro_Ar, y = pop_level_dat$MHC_STr, 
+plot(x = pop_level_dat$micro_Ai, y = pop_level_dat$mhc_STi, 
      xlab = expression(Microsatellite ~ Richness ~ (Micro-italic(Ar[pop]))), 
      ylab = expression(MHC ~ Supertype ~ Richness ~ (MHC-italic(STr[pop]))), 
      pch = ifelse(pop_level_dat$Predation == "High", 19, 17), 
@@ -239,19 +239,20 @@ data.frame(ggeffects::ggpredict(model_micro_all_str, terms = c("Micro-Ar", "Pred
 ### Supplemental Figure 3
 
 ```{r Supp fig 3}
+load("../output/supp_fig3.Rdata")
 #use output from models in text
-pred_o_STi <- ggpredict(model_o_null_para, terms = "MHC_STr")
-pred_b_STi <- ggpredict(model_b_null_para, terms = "MHC_STr")
-pred_o_Ai  <- ggpredict(model_o_null_para, terms = "MHC_Ar")
-pred_b_Ai  <- ggpredict(model_b_null_para, terms = "MHC_Ar")
+pred_o_STi <- ggpredict(model_o_null_para, terms = "mhc_STi")
+pred_b_STi <- ggpredict(model_b_null_para, terms = "mhc_STi")
+pred_o_Ai  <- ggpredict(model_o_null_para, terms = "mhc_Ai")
+pred_b_Ai  <- ggpredict(model_b_null_para, terms = "mhc_Ai")
 
 #Supplemental Figure 3
-png(filename =  "../Figures/Non_Effect Colour_2026-08-19.png", width = 8, height = 8, units = "in", bg = "white", res = 300)
+png(filename =  "../Figures/Non_Effect Colour_2026-09-1png", width = 8, height = 8, units = "in", bg = "white", res = 300)
 op <- par(mfrow = c(2,2),
           mar = c(6.5, 4.1, 1.1, 2.1),
           cex.lab = 1.5)
 #orange colours
-plot(x = pop_level_dat$MHC_STr, y = pop_level_dat$mean_o
+plot(x = pop_level_dat$mhc_STi, y = pop_level_dat$mean_o
      , xlab = "", ylab = "Relative Orange Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
@@ -272,7 +273,7 @@ legend(x = 4.1, y = 0.15
        , cex = 1.05)
 #regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$MHC_STr), col = "black")
 lines(pred_o_STi$x, pred_o_STi$predicted, col = "black", lwd = 2)
-plot(x = pop_level_dat$MHC_STr, y = pop_level_dat$mean_b
+plot(x = pop_level_dat$mhc_STi, y = pop_level_dat$mean_b
      , xlab = "", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
@@ -280,9 +281,9 @@ plot(x = pop_level_dat$MHC_STr, y = pop_level_dat$mean_b
 title(xlab = expression(atop(MHC ~ Supertype ~ Richness, (MHC-italic(STr[pop])))), 
       mgp = c(5, 1, 0))
 #regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$MHC_STr), col = "black")
-lines(pred_b_STi$x, pred_b_STi$predicted, col = "grey60", lwd = 2)
+lines(pred_b_STi$x, pred_b_STi$predicted, col = "grey60", lwd = 2, lty = "dashed")
 
-plot(x = pop_level_dat$MHC_Ar, y = pop_level_dat$mean_o
+plot(x = pop_level_dat$mhc_Ai, y = pop_level_dat$mean_o
      , xlab = "", ylab = "Relative Orange Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
@@ -290,9 +291,9 @@ plot(x = pop_level_dat$MHC_Ar, y = pop_level_dat$mean_o
 title(xlab = expression(atop(MHC ~ Allelic ~ Richness,(MHC-italic(Ar[pop])))), 
       mgp = c(5, 1, 0))
 #regLine(lm(PopDF_parasites$mean_o ~ PopDF_parasites$MHC_Ar), col = "black")
-lines(pred_o_Ai$x, pred_o_Ai$predicted, col = "grey60", lwd = 2)
+lines(pred_o_Ai$x, pred_o_Ai$predicted, col = "grey60", lwd = 2, lty = "dashed")
 
-plot(x = pop_level_dat$MHC_Ar, y = pop_level_dat$mean_b
+plot(x = pop_level_dat$mhc_Ai, y = pop_level_dat$mean_b
      , xlab = "", ylab = "Relative Black Area"
      , pch = ifelse(PopDF_parasites$Predation == "High", 19, 17), cex = 2
      , col = drainage_colours
@@ -300,11 +301,111 @@ plot(x = pop_level_dat$MHC_Ar, y = pop_level_dat$mean_b
 title(xlab = expression(atop(MHC ~ Allelic ~ Richness,(MHC-italic(Ar[pop])))), 
       mgp = c(5, 1, 0))
 #regLine(lm(PopDF_parasites$mean_b ~ PopDF_parasites$MHC_Ar), col = "black")
-lines(pred_b_Ai$x, pred_b_Ai$predicted, col = "grey60", lwd = 2)
+lines(pred_b_Ai$x, pred_b_Ai$predicted, col = "grey60", lwd = 2, lty = "dashed")
 par(op)
 dev.off()
 
 ```
+
+###  quadratic supertype richness figure
+
+```{r quad model figure prep}
+load("../output/fig4.Rdata")
+
+
+predicted_data <- data.frame(
+  STi = seq(min(data_analysis_parasites$STi, na.rm = TRUE), 
+            max(data_analysis_parasites$STi, na.rm = TRUE), 
+            length.out = 100),
+  Ai = mean(data_analysis_parasites$Ai, na.rm = TRUE),
+  microsat_rich = mean(data_analysis_parasites$microsat_rich, na.rm = TRUE),
+  length_sc = mean(data_analysis_parasites$length_sc, na.rm = TRUE),
+  Predation = levels(factor(data_analysis_parasites$Predation))[1],
+  Drainage = levels(factor(data_analysis_parasites$Drainage))[1]
+)
+
+#add CI ribbon
+mod_terms <- delete.response(terms(model_sti_quad))
+original_levels <- model_sti_quad@frame[, sapply(model_sti_quad@frame, is.factor), drop = FALSE]
+factor_lists    <- lapply(original_levels, levels)
+X <- model.matrix(mod_terms, data = predicted_data, xlev = factor_lists)
+se_link <- sqrt(diag(X %*% as.matrix(vcov(model_sti_quad)) %*% t(X)))
+
+predicted_data$Predicted_Link <- predict(model_sti_quad, newdata = predicted_data, re.form = NA, type = "link")
+predicted_data$LL <- exp(predicted_data$Predicted_Link - 1.96 * se_link)
+predicted_data$UL <- exp(predicted_data$Predicted_Link + 1.96 * se_link)
+
+# re.form = NA ignores random effects to show the population-level trend
+predicted_data$Predicted <- predict(model_sti_quad, newdata = predicted_data, re.form = NA, type = "response")
+
+# separate linear and quad terms
+betas <- fixef(model_sti_quad)
+linear_col_idx <- grep("poly\\(STi.*\\)1", colnames(X))
+quad_col_idx   <- grep("poly\\(STi.*\\)2", colnames(X))
+full_link <- X %*% betas
+
+linear_link <- full_link - (X[, quad_col_idx] * betas[quad_col_idx])
+predicted_data$Linear_Component <- exp(linear_link)
+
+quad_link <- full_link - (X[, linear_col_idx] * betas[linear_col_idx])
+predicted_data$Quadratic_Component <- exp(quad_link)
+
+# with CIs
+# 1. Extract the model's variance-covariance matrix
+vcov_mat <- as.matrix(vcov(model_sti_quad))
+betas    <- fixef(model_sti_quad)
+
+# 2. Identify the column indices for the polynomial terms
+linear_col_idx <- grep("poly\\(STi.*\\)1", colnames(X))
+quad_col_idx   <- grep("poly\\(STi.*\\)2", colnames(X))
+
+# 3. ISOLATE LINEAR COMPONENT: Create a design matrix where the quadratic term is zeroed out
+X_linear <- X
+X_linear[, quad_col_idx] <- 0
+
+linear_link <- X_linear %*% betas
+se_linear_link <- sqrt(diag(X_linear %*% vcov_mat %*% t(X_linear)))
+
+predicted_data$Linear_Component <- exp(linear_link)
+predicted_data$Linear_LL        <- exp(linear_link - 1.96 * se_linear_link)
+predicted_data$Linear_UL        <- exp(linear_link + 1.96 * se_linear_link)
+
+# 4. ISOLATE QUADRATIC COMPONENT: Create a design matrix where the linear term is zeroed out
+X_quad <- X
+X_quad[, linear_col_idx] <- 0
+
+quad_link <- X_quad %*% betas
+se_quad_link <- sqrt(diag(X_quad %*% vcov_mat %*% t(X_quad)))
+
+predicted_data$Quadratic_Component <- exp(quad_link)
+predicted_data$Quadratic_LL        <- exp(quad_link - 1.96 * se_quad_link)
+predicted_data$Quadratic_UL        <- exp(quad_link + 1.96 * se_quad_link)
+```
+
+
+
+```{r quad model figure plot}
+# with both linear and quadratic compenents
+png(filename = "../Figures/QuadraticParasite_2026-09-11.png", width = 5, height = 5, units = "in", bg = "white", res = 320)
+
+ggplot(data_analysis_parasites, aes(x = STi)) +
+  geom_point(aes(y = Tparasites), alpha = 0.25, color = "darkgray", position = position_jitter(height = 0.1, width = 0)) + 
+  geom_ribbon(data = predicted_data, aes(ymin = Linear_LL, ymax = Linear_UL, fill = "Linear Component"), alpha = 0.12, show.legend = FALSE) +
+  geom_ribbon(data = predicted_data, aes(ymin = Quadratic_LL, ymax = Quadratic_UL, fill = "Quadratic Component"), alpha = 0.12, show.legend = FALSE) +
+  geom_line(data = predicted_data, aes(y = Linear_Component, color = "Linear Component"), size = 1.2, linetype = "dashed") +
+  geom_line(data = predicted_data, aes(y = Quadratic_Component, color = "Quadratic Component"), size = 1.2, linetype = "solid") +
+  scale_color_manual(name = "Model Components", values = c("Linear Component" = "cornflowerblue", "Quadratic Component" = "goldenrod")) +
+  scale_fill_manual(values = c("Linear Component" = "cornflowerblue", "Quadratic Component" = "goldenrod")) +
+  theme_classic() +
+  theme(legend.position = "bottom", 
+        panel.grid.minor = element_blank()) +
+  labs(x = "MHC Supertype Richness",
+    y = "Gyrodactylus Abundance")
+
+dev.off()
+
+```
+
 
 ### Coinertia Supplemental Figures
 

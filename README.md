@@ -118,6 +118,7 @@ Sharing/access information
 Folder and file overview
 -
 1. File List: 
+in archive.zip:
 
 [code]: [contains all scripts to run analysis and generate figures]
 
@@ -131,7 +132,7 @@ Folder and file overview
 
 [output]: [for files generated from data prep and analysis.]
 
-[data]: [place files from data repository here, required to run scripts]
+[data]: [place files from data repository here, contents required to run scripts]
 
 2. Relationship between files, if important:
 
