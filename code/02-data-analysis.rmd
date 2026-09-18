@@ -32,7 +32,14 @@ load(file = "../output/analysis_2.RData")
 load(file = "../output/analysis_3.RData")
 
 pop_level_dat <- pop_level_dat %>% 
-  mutate(gyro_present = ifelse(gyro_prevalence > 0.1, "Yes", "No"))
+  mutate(gyro_present = ifelse(gyro_prevalence > 0.1, "Yes", "No")) %>% 
+  mutate(Site = as.factor(Site))
+
+data_analysis_parasites <- data_analysis_parasites %>% 
+  mutate(Site = as.factor(Site))
+
+data_analysis <- data_analysis %>% 
+  mutate(Site = as.factor(Site))
 ```
 
 
@@ -178,48 +185,100 @@ plot(rv10) # p-value = 0.065, rv = 0.30
 ```
 
 #### Pearson's Correlations on key interactions at population level
-```{r PCC}
+
+```{r visualization, eval = FALSE, include = FALSE}
 #correlation plot
 PopDF_parasites %>% 
   correlate() %>% 
   focus(prevalence)
 
-
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST1, method = "pearson")
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST2, method = "pearson") #sig
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST3, method = "pearson")
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST4, method = "pearson") 
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST5, method = "pearson")
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST6, method = "pearson")
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST7, method = "pearson")
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST8, method = "pearson")
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST9, method = "pearson")
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST10, method = "pearson") #sig
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$ST11, method = "pearson") #sig
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$mean_o, method = "pearson") # strong but insig p = 0.09
-
 PopDF_parasites %>% 
   correlate() %>% 
   focus(mean_o)
+```
 
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$MHC_STr, method = "pearson") #sig
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$MHC_Ar, method = "pearson") #sig
+Pearson's correlation for prevalence and mean orange, two-tailed
+```{r PCC}
+prevalence_pval <- list()
+mean_o_pval <- list()
 
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$MHC_STr, method = "pearson") #sig
-cor.test(PopDF_parasites$prevalence, PopDF_parasites$MHC_Ar, method = "pearson") #sig
+labels  <- c(paste0("ST", 1:12), "mhc_STi", "mhc_Ai", "mean_o", "prevalence")
+columns <- c(paste0("ST", 1:12), "mhc_STi", "mhc_Ai", "mean_o", "prevalence")
 
+
+for (i in seq_along(labels)) {
+  prevalence_pval[labels[i]] <- cor.test(PopDF_parasites$prevalence, PopDF_parasites[[columns[i]]],
+                                      method = "pearson", alternative = "two.sided")[[3]]
+}
+
+
+for (i in seq_along(labels)) {
+  mean_o_pval[labels[i]] <- cor.test(PopDF_parasites$mean_o, PopDF_parasites[[columns[i]]],
+                                      method = "pearson", alternative = "two.sided")[[3]]
+}
+# Benjamin-Hochberg False Discvovery Rate correction
+
+#STr correlated significantly, positive correlation 0.77
+prevalence_fdrs<-p.adjust(prevalence_pval, method="BH")
 #of the ST none correlated with orange
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST1, method = "pearson")
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST2, method = "pearson") 
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST3, method = "pearson")
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST4, method = "pearson") 
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST5, method = "pearson")
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST6, method = "pearson")
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST7, method = "pearson")
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST8, method = "pearson")
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST9, method = "pearson")
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST10, method = "pearson") 
-cor.test(PopDF_parasites$mean_o, PopDF_parasites$ST11, method = "pearson") 
+orange_fdrs<-p.adjust(mean_o_pval, method="BH")
+```
+
+
+permutation-based global test
+```{r global correlation test for prevalence}
+set.seed(3)
+prevalence <- PopDF_parasites$prevalence
+st_freq <- as.matrix(PopDF_parasites[,12:23])
+colnames(st_freq) <- paste0("ST", 1:12)
+
+#calculate the global correlation
+compute_S <- function(prevalence, st_freq) {
+  r <- apply(st_freq, 2, function(col) cor.test(col, prevalence, method = "pearson", alternative = "two.sided")[[4]]) # pulls estimate of correlation
+  sum(r^2)
+}
+
+S_obs_prev <- compute_S(prevalence, st_freq)
+
+#permutation test
+n_perm <- 10000
+S_perm_prev <- numeric(n_perm)
+
+for (i in 1:n_perm) {
+  prevalence_shuffled <- sample(prevalence)      # break the pairing
+  S_perm_prev[i] <- compute_S(prevalence_shuffled, st_freq)
+}
+
+# determining significance
+p_value_prev <- sum(S_perm_prev >= S_obs_prev) / n_perm
+
+```
+
+
+
+```{r global correlation test for orange}
+mean_o <- PopDF_parasites$mean_o
+colnames(st_freq) <- paste0("ST", 1:12)
+
+#calculate the global correlation
+compute_S <- function(mean_o, st_freq) {
+  r <- apply(st_freq, 2, function(col) cor.test(col, mean_o, method = "pearson", alternative = "two.sided")[[4]]) # pulls estimate of correlation
+  sum(r^2)
+}
+
+S_obs_orange <- compute_S(mean_o, st_freq)
+
+#permutation test
+n_perm <- 10000
+S_perm_orange <- numeric(n_perm)
+
+for (i in 1:n_perm) {
+  mean_o_shuffled <- sample(mean_o)      # break the pairing
+  S_perm_orange[i] <- compute_S(mean_o_shuffled, st_freq)
+}
+
+# determining significance
+p_value_orange <- sum(S_perm_orange >= S_obs_orange) / n_perm
 
 ```
 
@@ -320,6 +379,8 @@ check_model(model_b)
 
 summary(model_o)
 summary(model_b)
+#car::Anova(model_b)
+#car::Anova(model_o)
 ```
 
 Move to figures.rmd?
@@ -686,7 +747,7 @@ black_individual <- aictab(cand.set = black_individual_analysis, modnames = blac
   rename(LL = Res.LL)
 
 quad_analysis <- list(model_sti_quad, model_ai_quad, model_both_quad)
-quad_names <- c("Abundance ~ poly(STi, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)", "Abundance ~ poly(MHC-Ar, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)", "Abundance ~ poly(MHC-Ar, 2, raw = FALSE) + poly(STi, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)")
+quad_names <- c("Abundance ~ MHC-Ar + poly(MHC-STr, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)", "Abundance ~ poly(MHC-Ar, 2, raw = FALSE) + MHC-STr + Length + Predation + Drainage + (1|Site)", "Abundance ~ poly(MHC-Ar, 2, raw = FALSE) + poly(MHC-STr, 2, raw = FALSE) + Length + Predation + Drainage + (1|Site)")
 
 quad <- aictab(cand.set = quad_analysis, modnames = quad_names, second.ord = FALSE) %>% 
   mutate(analysis = "Polynomial selection for abundance", R2 = NA) %>% 
@@ -720,6 +781,8 @@ save(PopDF_parasites, pop_level_dat, file = "../output/fig3.Rdata")
 save(model_micro_all_str_r2, model_micro_all_ar_r2, model_micro_all_ar, model_micro_all_str, file = "../output/microsat_figs.RData")
 
 save(model_o_null_para, model_b_null_para, pop_level_dat, file = "../output/supp_fig3.RData")
+
+save(S_perm_orange, S_obs_orange, S_obs_prev, S_perm_prev, file = "../output/supp_fig4.RData")
 
 save(model_sti_quad, data_analysis_parasites, file = "../output/fig4.RData")
 

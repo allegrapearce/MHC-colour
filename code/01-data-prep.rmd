@@ -265,6 +265,12 @@ allele_counts %>%
 # private vs shared alleles
 allele_counts %>% 
   count(status) # 95 private and 67 shared
+
+site_summary <- genotype_dat_wide_subset %>% 
+  group_by(Site) %>% 
+  summarize(mean_Ar = mean(Ai), mean_STr = mean(STi), 
+            min_Ar = min(Ai), max_Ar = max(Ai), 
+            min_STr = min(STi), max_STr = max(STi))
 ```
 
 

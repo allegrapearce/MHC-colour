@@ -6,7 +6,7 @@ output: html_document
 ---
 
 
-```{r setup include = FALSE}
+```{r setup }
 library(car)
 library(ggplot2)
 library(gridExtra)
@@ -87,7 +87,7 @@ grid_arrange_shared_legend <-
 ```{r Fig 2}
 #ggplot black
 bplot <- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]", "Drainage"))) %>% 
-  ggplot(aes(x = x, y = predicted, group = group), show.legend = F) +
+  ggplot(aes(x = x, y = predicted, group = group)) +
   geom_ribbon(aes(x = x, ymin = predicted - std.error, ymax = predicted + std.error, group = group, fill = group), alpha = 0.35) +
   geom_line(aes(x = x, y = predicted, group = group, colour = group)) +
   geom_jitter(inherit.aes = FALSE,
@@ -97,8 +97,9 @@ bplot <- data.frame(ggeffects::ggpredict(model_b, terms = c("Tparasites [0:12]",
              alpha = 0.5) +
   scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
   scale_fill_manual(values = c("#ed8a8a","#8292ed","#ebdb81")) +
+  coord_cartesian(ylim = c(0, 0.39)) +
   scale_x_continuous(breaks = seq(0, 12, by = 1)) +
-  xlab("Individual Parasite Load") +
+  xlab("Individual Parasite Abundance") +
   ylab("Relative Area Black") +
   labs(colour = "Drainage", fill = "Drainage") +
   theme_classic() +
@@ -117,14 +118,15 @@ oplot <- data.frame(ggeffects::ggpredict(model_o, terms = c("Tparasites [0:12]",
   scale_color_manual(values = c("#ed3e3e","#425ced","#edd442")) +
   scale_fill_manual(values = c("#ed8a8a","#8292ed","#ebdb81")) +
   scale_x_continuous(breaks = seq(0, 12, by = 1)) +
-  xlab("Individual Parasite Load") +
+  coord_cartesian(ylim = c(0, 0.39)) +
+  xlab("Individual Parasite Abundance") +
   ylab("Relative Area Orange") +
   labs(colour = "Drainage", fill = "Drainage") +
   theme_classic() +
   theme(legend.position = "bottom")
 
 
-png(filename = "../Figures/ColourParasite 2026-09-11.png", width = 8, height = 4, units = "in", bg = "white", res = 320)
+png(filename = "../Figures/ColourParasite 2026-09-17.png", width = 8, height = 4, units = "in", bg = "white", res = 320)
 
 grid_arrange_shared_legend(oplot, bplot)
 dev.off()
@@ -307,6 +309,47 @@ dev.off()
 
 ```
 
+### Supplemental Figure 4
+
+global correlation fig
+```{r supp fig 4}
+load("../output/supp_fig4.RData")
+
+p1 <- ggplot(data.frame(S_perm = S_perm_prev), aes(x = S_perm)) +
+  geom_histogram(bins = 50, fill = "grey70", color = "white") +
+  geom_vline(xintercept = S_obs_prev, color = "red", linewidth = 1) +
+  annotate(
+    "text",
+    x = S_obs_prev, y = Inf,
+    label = paste("Observed S =", round(S_obs_prev, 3)),
+    color = "red", hjust = -0.05, vjust = 1.5
+  ) +
+  labs(title = "Gyrodactylus Prevalence",
+    x = expression(paste("S (sum of ", r^2, " across 12 STs)")),
+    y = "Count"
+  ) +
+  theme_classic()
+
+p2 <- ggplot(data.frame(S_perm = S_perm_orange), aes(x = S_perm)) +
+  geom_histogram(bins = 50, fill = "grey70", color = "white") +
+  geom_vline(xintercept = S_obs_orange, color = "red", linewidth = 1) +
+  annotate(
+    "text",
+    x = S_obs_orange, y = Inf,
+    label = paste("Observed S =", round(S_obs_orange, 3)),
+    color = "red", hjust = -0.05, vjust = 1.5
+  ) +
+  labs(title ="Mean Orange Area",
+    x = expression(paste("S (sum of ", r^2, " across 12 STs)")),
+    y = "Count"
+  ) +
+  theme_classic()
+
+png(filename = "../Figures/fig_perm_test_2026-09-16.png", width = 10.25, height = 5, units = "in", bg = "white", res = 320)
+print(p1 + p2)
+dev.off()
+```
+
 ###  quadratic supertype richness figure
 
 ```{r quad model figure prep}
@@ -446,6 +489,3 @@ dev.off()
 ```
 
 
-## Parasite figure
-
-maybe a figure representing the difference between intensity and infection incidence?
